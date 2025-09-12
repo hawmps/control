@@ -1,0 +1,740 @@
+import { useState, useEffect } from 'react';
+import { Shield, Edit } from 'lucide-react';
+import { SearchBar, useToast, Modal, Tooltip } from '../components/ui';
+import { getControlMatrixData, updateControlImplementation } from '../services/securityData';
+import { getStatusConfig, getStatusName } from '../utils/statusConfig';
+import type { Item, Environment, SecurityControl, ControlStatus } from '../types';
+
+interface EnvironmentWithControlStatuses extends Environment {
+  controlStatuses: Record<number, { status: string; notes: string }>;
+}
+
+interface MatrixData {
+  controls: SecurityControl[];
+  environments: EnvironmentWithControlStatuses[];
+}
+
+export default function Items() {
+  const [matrixData, setMatrixData] = useState<MatrixData>({ controls: [], environments: [] });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [selectedItemControl, setSelectedItemControl] = useState<{
+    item: EnvironmentWithControlStatuses;
+    control: SecurityControl;
+    currentStatus: string;
+    currentNotes: string;
+  } | null>(null);
+  const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<EnvironmentWithControlStatuses | null>(null);
+  const { success } = useToast();
+  const [statusConfig, setStatusConfig] = useState(getStatusConfig());
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const data = await getControlMatrixData();
+        setMatrixData(data);
+      } catch (error) {
+        console.error('Failed to load matrix data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  // Listen for status config changes when user navigates back from Manage Status page
+  useEffect(() => {
+    const handleFocus = () => {
+      setStatusConfig(getStatusConfig());
+    };
+    
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, []);
+
+  const filteredEnvironments = (matrixData.environments || []).filter(environment => 
+    environment.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (environment.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+    (environment.category?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+    (environment.owner?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+  );
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'green': return 'bg-green-500';
+      case 'yellow': return 'bg-yellow-500';
+      case 'red': return 'bg-red-500';
+      case 'unknown': return 'bg-gray-300';
+      default: return 'bg-gray-300';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'green': return '●';
+      case 'yellow': return '●';
+      case 'red': return '●';
+      case 'unknown': return '○';
+      default: return '○';
+    }
+  };
+
+
+  const handleStatusClick = (item: EnvironmentWithControlStatuses, control: SecurityControl) => {
+    const controlStatus = item.controlStatuses[control.id];
+    setSelectedItemControl({
+      item,
+      control,
+      currentStatus: controlStatus.status,
+      currentNotes: controlStatus.notes
+    });
+    setIsStatusModalOpen(true);
+  };
+
+  const handleEnvironmentClick = (environment: EnvironmentWithControlStatuses) => {
+    setSelectedItem(environment);
+    setIsItemModalOpen(true);
+  };
+
+  const handleEnvironmentUpdate = (updatedEnvironment: EnvironmentWithControlStatuses) => {
+    // Update the main matrix data
+    const updatedEnvironments = (matrixData.environments || []).map(environment => 
+      environment.id === updatedEnvironment.id ? updatedEnvironment : environment
+    );
+    
+    setMatrixData({
+      ...matrixData,
+      environments: updatedEnvironments
+    });
+  };
+
+  const handleStatusUpdate = async (newStatus: string, newNotes: string) => {
+    if (!selectedItemControl) return;
+
+    try {
+      // Update in database
+      await updateControlImplementation(
+        selectedItemControl.item.id,
+        selectedItemControl.control.id,
+        newStatus,
+        newNotes
+      );
+
+      // Update local state
+      const updatedEnvironments = (matrixData.environments || []).map(environment => {
+        if (environment.id === selectedItemControl.item.id) {
+          return {
+            ...environment,
+            controlStatuses: {
+              ...environment.controlStatuses,
+              [selectedItemControl.control.id]: {
+                status: newStatus,
+                notes: newNotes
+              }
+            }
+          };
+        }
+        return environment;
+      });
+
+      setMatrixData({
+        ...matrixData,
+        environments: updatedEnvironments
+      });
+
+      setIsStatusModalOpen(false);
+      success(`Updated ${selectedItemControl.control.name} status for ${selectedItemControl.item.name}`);
+    } catch (error) {
+      console.error('Failed to update control implementation:', error);
+      // You could show an error toast here
+    }
+  };
+
+  // Calculate overall statistics
+  const totalEnvironments = (matrixData.environments || []).length;
+  const totalControls = (matrixData.controls || []).length;
+  let greenCount = 0, yellowCount = 0, redCount = 0, unknownCount = 0;
+  
+  (matrixData.environments || []).forEach(environment => {
+    Object.values(environment.controlStatuses || {}).forEach(controlStatus => {
+      if (controlStatus.status === 'green') greenCount++;
+      else if (controlStatus.status === 'yellow') yellowCount++;
+      else if (controlStatus.status === 'red') redCount++;
+      else unknownCount++;
+    });
+  });
+
+  const highRiskEnvironments = (matrixData.environments || []).filter(environment => 
+    environment.criticality === 'critical' || environment.criticality === 'high'
+  ).length;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Security Control Status</h1>
+        <p className="text-gray-600">Monitor security control implementation across all environments</p>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <span className="text-green-600 text-lg">●</span>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">{getStatusName('green')}</p>
+              <p className="text-2xl font-bold text-gray-900">{greenCount}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+              <span className="text-yellow-600 text-lg">●</span>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">{getStatusName('yellow')}</p>
+              <p className="text-2xl font-bold text-gray-900">{yellowCount}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <span className="text-red-600 text-lg">●</span>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">{getStatusName('red')}</p>
+              <p className="text-2xl font-bold text-gray-900">{redCount}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+              <span className="text-gray-600 text-lg">○</span>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">{getStatusName('unknown')}</p>
+              <p className="text-2xl font-bold text-gray-900">{unknownCount}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="bg-gray-50 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">Status Legend</h3>
+        <div className="flex space-x-6 text-sm">
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-green-500 rounded-full mr-2"></div>
+            <span>Green - {getStatusName('green')}</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-yellow-500 rounded-full mr-2"></div>
+            <span>Yellow - {getStatusName('yellow')}</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-red-500 rounded-full mr-2"></div>
+            <span>Red - {getStatusName('red')}</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-4 h-4 bg-gray-300 rounded-full mr-2"></div>
+            <span>Gray - {getStatusName('unknown')}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-4">
+        <div className="flex-1">
+          <SearchBar
+            value={searchQuery}
+            onSearch={setSearchQuery}
+            placeholder="Search environments by name, description, category, or owner..."
+            className="max-w-md"
+          />
+        </div>
+      </div>
+
+      {/* Control Matrix Table */}
+      <div className="card">
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <span className="ml-3 text-gray-600">Loading security controls...</span>
+          </div>
+        )}
+        
+        {!loading && filteredEnvironments.length === 0 && (
+          <div className="text-center py-12">
+            <Shield className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No environments found</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Create your first environment to get started with security control tracking.
+            </p>
+          </div>
+        )}
+        
+        {!loading && filteredEnvironments.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-gray-50">
+                <tr className="border-b border-gray-200">
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-900 sticky left-0 bg-gray-50 border-r border-gray-200 z-10 shadow-sm">
+                    <div className="min-w-[200px]">Environment</div>
+                  </th>
+                  {(matrixData.controls || []).map((control) => (
+                    <th key={control.id} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-r border-gray-200">
+                      <Tooltip 
+                        content={control.description || control.name}
+                        position="bottom"
+                        className="min-w-[140px] whitespace-normal leading-tight cursor-help"
+                      >
+                        <div>
+                          {control.name}
+                        </div>
+                      </Tooltip>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredEnvironments.map((environment) => (
+                  <tr key={environment.id} className="hover:bg-gray-50">
+                    <td 
+                      className="px-6 py-4 sticky left-0 bg-white hover:bg-gray-50 border-r border-gray-200 z-10 shadow-sm cursor-pointer"
+                      onClick={() => handleEnvironmentClick(environment)}
+                    >
+                      <div className="min-w-[200px]">
+                        <div className="text-sm font-medium text-gray-900 truncate">{environment.name}</div>
+                        <div className="text-xs text-gray-500 truncate">{environment.description}</div>
+                      </div>
+                    </td>
+                    {(matrixData.controls || []).map((control) => {
+                      const controlStatus = environment.controlStatuses[control.id];
+                      return (
+                        <td key={control.id} className="px-4 py-4 text-center border-r border-gray-200">
+                          <div className="min-w-[140px] flex justify-center">
+                            <div
+                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm cursor-pointer hover:scale-110 transition-transform ${getStatusColor(controlStatus.status)}`}
+                              title={`${control.name}: ${controlStatus.notes} (Click to edit)`}
+                              onClick={() => handleStatusClick(environment, control)}
+                            >
+                              {getStatusIcon(controlStatus.status)}
+                            </div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Status Edit Modal */}
+      <Modal
+        isOpen={isStatusModalOpen}
+        onClose={() => setIsStatusModalOpen(false)}
+        title="Edit Control Status"
+      >
+        {selectedItemControl && (
+          <StatusEditForm
+            item={selectedItemControl.item}
+            control={selectedItemControl.control}
+            currentStatus={selectedItemControl.currentStatus}
+            currentNotes={selectedItemControl.currentNotes}
+            onSave={handleStatusUpdate}
+            onCancel={() => setIsStatusModalOpen(false)}
+          />
+        )}
+      </Modal>
+
+      {/* Environment Details Modal */}
+      <Modal
+        isOpen={isItemModalOpen}
+        onClose={() => setIsItemModalOpen(false)}
+        title="Environment Details"
+        size="xl"
+      >
+        {selectedItem && (
+          <ItemDetailsView
+            item={selectedItem}
+            controls={matrixData.controls || []}
+            onClose={() => setIsItemModalOpen(false)}
+            onItemUpdate={handleEnvironmentUpdate}
+          />
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+// Status Edit Form Component
+interface StatusEditFormProps {
+  item: ItemWithControlStatuses;
+  control: SecurityControl;
+  currentStatus: string;
+  currentNotes: string;
+  onSave: (status: string, notes: string) => void;
+  onCancel: () => void;
+}
+
+function StatusEditForm({ item, control, currentStatus, currentNotes, onSave, onCancel }: StatusEditFormProps) {
+  const [status, setStatus] = useState(currentStatus);
+  const [notes, setNotes] = useState(currentNotes);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(status, notes);
+  };
+
+  const getStatusColor = (statusValue: string) => {
+    switch (statusValue) {
+      case 'green': return 'bg-green-500';
+      case 'yellow': return 'bg-yellow-500';
+      case 'red': return 'bg-red-500';
+      case 'unknown': return 'bg-gray-300';
+      default: return 'bg-gray-300';
+    }
+  };
+
+  const statusConfig = getStatusConfig();
+  const statusOptions = statusConfig.map(status => ({
+    value: status.value,
+    label: `${status.color.charAt(0).toUpperCase() + status.color.slice(1)} - ${status.name}`,
+    description: status.description
+  }));
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="bg-gray-50 rounded-lg p-4">
+        <h3 className="font-medium text-gray-900 mb-2">
+          {control.name} for {item.name}
+        </h3>
+        <p className="text-sm text-gray-600">
+          {control.description}
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Status
+        </label>
+        <div className="space-y-3">
+          {statusOptions.map((option) => (
+            <div
+              key={option.value}
+              className={`border rounded-lg p-3 cursor-pointer transition-colors ${
+                status === option.value 
+                  ? 'border-blue-500 bg-blue-50' 
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setStatus(option.value)}
+            >
+              <div className="flex items-center">
+                <div className={`w-4 h-4 rounded-full mr-3 ${getStatusColor(option.value)}`}></div>
+                <div>
+                  <div className="text-sm font-medium text-gray-900">{option.label}</div>
+                  <div className="text-xs text-gray-500">{option.description}</div>
+                </div>
+                <div className="ml-auto">
+                  <input
+                    type="radio"
+                    name="status"
+                    value={option.value}
+                    checked={status === option.value}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Notes
+        </label>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          rows={4}
+          placeholder="Add notes about the implementation status, issues, or next steps..."
+        />
+      </div>
+
+      <div className="flex justify-end space-x-3 pt-4 border-t">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+        >
+          Save Changes
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// Item Details View Component
+interface ItemDetailsViewProps {
+  item: ItemWithControlStatuses;
+  controls: SecurityControl[];
+  onClose: () => void;
+  onItemUpdate: (updatedItem: ItemWithControlStatuses) => void;
+}
+
+function ItemDetailsView({ item, controls, onClose, onItemUpdate }: ItemDetailsViewProps) {
+  const [editingNotes, setEditingNotes] = useState<{[key: string]: string}>({});
+  const [localItem, setLocalItem] = useState(item);
+  const { success } = useToast();
+
+  // Update localItem when the parent item prop changes
+  useEffect(() => {
+    setLocalItem(item);
+  }, [item]);
+
+  const getCriticalityColor = (criticality: string) => {
+    switch (criticality) {
+      case 'critical': return 'bg-red-100 text-red-800';
+      case 'high': return 'bg-orange-100 text-orange-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const handleNotesClick = (controlId: string) => {
+    const currentNotes = localItem.controlStatuses[controlId]?.notes || '';
+    setEditingNotes({ ...editingNotes, [controlId]: currentNotes });
+  };
+
+  const handleNotesChange = (controlId: string, value: string) => {
+    setEditingNotes({ ...editingNotes, [controlId]: value });
+  };
+
+  const handleNotesSave = async (controlId: string) => {
+    const newNotes = editingNotes[controlId] || '';
+    const currentStatus = localItem.controlStatuses[controlId]?.status || 'red';
+    
+    try {
+      // Update in database
+      await updateControlImplementation(
+        localItem.id,
+        parseInt(controlId),
+        currentStatus,
+        newNotes
+      );
+
+      // Update local state
+      const updatedItem = {
+        ...localItem,
+        controlStatuses: {
+          ...localItem.controlStatuses,
+          [controlId]: {
+            ...localItem.controlStatuses[controlId],
+            notes: newNotes
+          }
+        }
+      };
+      
+      setLocalItem(updatedItem);
+      
+      // Update parent component
+      onItemUpdate(updatedItem);
+
+      // Clear editing state
+      const newEditingNotes = { ...editingNotes };
+      delete newEditingNotes[controlId];
+      setEditingNotes(newEditingNotes);
+
+      success(`Updated notes for ${controls.find(c => c.id === parseInt(controlId))?.name || 'control'}`);
+    } catch (error) {
+      console.error('Failed to update notes:', error);
+    }
+  };
+
+  const handleNotesCancel = (controlId: string) => {
+    const newEditingNotes = { ...editingNotes };
+    delete newEditingNotes[controlId];
+    setEditingNotes(newEditingNotes);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Item Header */}
+      <div className="bg-gray-50 rounded-lg p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">{item.name}</h2>
+            <p className="text-gray-600 mb-4">{item.description}</p>
+            
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center">
+                <span className="text-sm font-medium text-gray-500">Criticality:</span>
+                <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getCriticalityColor(item.criticality)}`}>
+                  {item.criticality?.charAt(0).toUpperCase() + item.criticality?.slice(1) || 'Unknown'}
+                </span>
+              </div>
+              
+              {item.category && (
+                <div className="flex items-center">
+                  <span className="text-sm font-medium text-gray-500">Category:</span>
+                  <span className="ml-2 text-sm text-gray-900">{item.category}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Item Properties */}
+      <div className="space-y-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Environment Information</h3>
+          
+          {item.item_type && (
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm font-medium text-gray-500">Type:</span>
+              <span className="text-sm text-gray-900">{item.item_type}</span>
+            </div>
+          )}
+          
+          {item.owner && (
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-sm font-medium text-gray-500">Owner:</span>
+              <span className="text-sm text-gray-900">{item.owner}</span>
+            </div>
+          )}
+          
+          <div className="flex justify-between py-2 border-b border-gray-100">
+            <span className="text-sm font-medium text-gray-500">Created:</span>
+            <span className="text-sm text-gray-900">{formatDate(item.created_at)}</span>
+          </div>
+          
+          <div className="flex justify-between py-2 border-b border-gray-100">
+            <span className="text-sm font-medium text-gray-500">Last Updated:</span>
+            <span className="text-sm text-gray-900">{formatDate(item.updated_at)}</span>
+          </div>
+        </div>
+
+        {/* Control Status Summary */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Control Status Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(localItem.controlStatuses).map(([controlId, status]) => {
+              const control = controls.find(c => c.id === parseInt(controlId));
+              const isEditing = editingNotes.hasOwnProperty(controlId);
+              
+              return (
+                <div key={controlId} className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className={`w-4 h-4 rounded-full ${
+                      status.status === 'green' ? 'bg-green-500' :
+                      status.status === 'yellow' ? 'bg-yellow-500' :
+                      status.status === 'red' ? 'bg-red-500' :
+                      status.status === 'unknown' ? 'bg-gray-300' :
+                      'bg-gray-300'
+                    }`}></div>
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-gray-900 line-clamp-2">
+                        {control?.name || `Control ${controlId}`}
+                      </span>
+                      {control?.description && (
+                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                          {control.description}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="mt-3">
+                    <span className="font-medium text-sm text-gray-700">Notes:</span>
+                    {isEditing ? (
+                      <div className="mt-2 space-y-2">
+                        <textarea
+                          value={editingNotes[controlId]}
+                          onChange={(e) => handleNotesChange(controlId, e.target.value)}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                          rows={3}
+                          placeholder="Add notes about the implementation..."
+                          autoFocus
+                        />
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleNotesSave(controlId)}
+                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => handleNotesCancel(controlId)}
+                            className="px-3 py-1 text-xs bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => handleNotesClick(controlId)}
+                        className="mt-1 text-sm text-gray-600 cursor-pointer hover:bg-gray-100 rounded p-1 transition-colors min-h-[2rem] flex items-start"
+                        title="Click to edit notes"
+                      >
+                        {status.notes || (
+                          <span className="text-gray-400 italic">Click to add notes...</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Close Button */}
+      <div className="flex justify-end pt-6 border-t">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}

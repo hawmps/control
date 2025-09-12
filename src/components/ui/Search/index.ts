@@ -1,0 +1,1 @@
+export { SearchBar, type SearchBarProps, type SearchFilter } from './SearchBar';
