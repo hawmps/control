@@ -29,7 +29,7 @@
     "db:wipe:complete": "tsx scripts/db-wipe.js --complete",
     "start": "npm run dev:full",
     "start:prod": "tsx server.js",
-    "stop": "taskkill /F /IM node.exe 2>nul || pkill -f \"concurrently|tsx|vite\" || true",
+    "stop": "taskkill /F /IM node.exe 2>/dev/null || pkill -f \"concurrently|tsx|vite\" || true",
     "restart": "npm run stop && npm run start",
     "status": "node scripts/check-status.js",
     "clean": "npm run stop && rimraf node_modules/.vite *.log",
