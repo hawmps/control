@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Shield, Edit } from 'lucide-react';
-import { SearchBar, useToast, Modal, Tooltip } from '../components/ui';
+import { SearchBar, useToast, Modal, Tooltip, SubControlModal } from '../components/ui';
 import { getControlMatrixData, updateControlImplementation } from '../services/securityData';
 import { getStatusConfig, getStatusName } from '../utils/statusConfig';
 import type { Item, Environment, SecurityControl, ControlStatus } from '../types';
@@ -27,6 +27,8 @@ export default function Items() {
   } | null>(null);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<EnvironmentWithControlStatuses | null>(null);
+  const [isSubControlModalOpen, setIsSubControlModalOpen] = useState(false);
+  const [selectedControl, setSelectedControl] = useState<SecurityControl | null>(null);
   const { success } = useToast();
   const [statusConfig, setStatusConfig] = useState(getStatusConfig());
 
@@ -88,7 +90,16 @@ export default function Items() {
   };
 
 
-  const handleStatusClick = (item: EnvironmentWithControlStatuses, control: SecurityControl) => {
+  const handleStatusClick = (item: EnvironmentWithControlStatuses, control: SecurityControl, event: React.MouseEvent) => {
+    // If it's a right-click or ctrl+click, show sub-controls modal
+    if (event.ctrlKey || event.metaKey || event.button === 2) {
+      event.preventDefault();
+      setSelectedControl(control);
+      setIsSubControlModalOpen(true);
+      return;
+    }
+
+    // Regular click shows status edit modal
     const controlStatus = item.controlStatuses[control.id];
     setSelectedItemControl({
       item,
@@ -97,6 +108,11 @@ export default function Items() {
       currentNotes: controlStatus.notes
     });
     setIsStatusModalOpen(true);
+  };
+
+  const handleSubControlClick = (control: SecurityControl) => {
+    setSelectedControl(control);
+    setIsSubControlModalOpen(true);
   };
 
   const handleEnvironmentClick = (environment: EnvironmentWithControlStatuses) => {
@@ -297,12 +313,15 @@ export default function Items() {
                   </th>
                   {(matrixData.controls || []).map((control) => (
                     <th key={control.id} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-r border-gray-200">
-                      <Tooltip 
-                        content={control.description || control.name}
+                      <Tooltip
+                        content={`${control.description || control.name} (Click to view sub-controls)`}
                         position="bottom"
-                        className="min-w-[140px] whitespace-normal leading-tight cursor-help"
+                        className="min-w-[140px] whitespace-normal leading-tight"
                       >
-                        <div>
+                        <div
+                          className="cursor-pointer hover:text-blue-600 hover:underline transition-colors"
+                          onClick={() => handleSubControlClick(control)}
+                        >
                           {control.name}
                         </div>
                       </Tooltip>
@@ -329,8 +348,9 @@ export default function Items() {
                           <div className="min-w-[140px] flex justify-center">
                             <div
                               className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm cursor-pointer hover:scale-110 transition-transform ${getStatusColor(controlStatus.status)}`}
-                              title={`${control.name}: ${controlStatus.notes} (Click to edit)`}
-                              onClick={() => handleStatusClick(environment, control)}
+                              title={`${control.name}: ${controlStatus.notes} (Click to edit, Ctrl+Click for sub-controls)`}
+                              onClick={(e) => handleStatusClick(environment, control, e)}
+                              onContextMenu={(e) => handleStatusClick(environment, control, e)}
                             >
                               {getStatusIcon(controlStatus.status)}
                             </div>
@@ -380,13 +400,22 @@ export default function Items() {
           />
         )}
       </Modal>
+
+      {/* Sub-Controls Modal */}
+      {selectedControl && (
+        <SubControlModal
+          isOpen={isSubControlModalOpen}
+          onClose={() => setIsSubControlModalOpen(false)}
+          control={selectedControl}
+        />
+      )}
     </div>
   );
 }
 
 // Status Edit Form Component
 interface StatusEditFormProps {
-  item: ItemWithControlStatuses;
+  item: EnvironmentWithControlStatuses;
   control: SecurityControl;
   currentStatus: string;
   currentNotes: string;
@@ -502,10 +531,10 @@ function StatusEditForm({ item, control, currentStatus, currentNotes, onSave, on
 
 // Item Details View Component
 interface ItemDetailsViewProps {
-  item: ItemWithControlStatuses;
+  item: EnvironmentWithControlStatuses;
   controls: SecurityControl[];
   onClose: () => void;
-  onItemUpdate: (updatedItem: ItemWithControlStatuses) => void;
+  onItemUpdate: (updatedItem: EnvironmentWithControlStatuses) => void;
 }
 
 function ItemDetailsView({ item, controls, onClose, onItemUpdate }: ItemDetailsViewProps) {

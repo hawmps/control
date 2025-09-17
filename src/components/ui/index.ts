@@ -15,3 +15,6 @@ export * from './Search';
 
 // Tooltip components
 export * from './Tooltip';
+
+// Sub-control modal
+export * from './SubControlModal';

@@ -15,6 +15,13 @@
       "when": 1757628554612,
       "tag": "0001_rare_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1758114891124,
+      "tag": "0002_stormy_triton",
+      "breakpoints": true
     }
   ]
 }

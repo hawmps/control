@@ -1,4 +1,4 @@
-import type { Item, Environment, SecurityControl, ControlImplementation } from '../types';
+import type { Item, Environment, SecurityControl, ControlImplementation, SubControl } from '../types';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -258,4 +258,47 @@ export const deleteSecurityControl = async (id: number): Promise<void> => {
     method: 'DELETE',
   });
   if (!response.ok) throw new Error('Failed to delete control');
+};
+
+// Sub-control service functions
+export const getSubControls = async (): Promise<SubControl[]> => {
+  const response = await fetch(`${API_BASE}/sub-controls`);
+  if (!response.ok) throw new Error('Failed to fetch sub-controls');
+  return response.json();
+};
+
+export const getSubControlsByControl = async (controlId: number): Promise<SubControl[]> => {
+  const response = await fetch(`${API_BASE}/sub-controls/control/${controlId}`);
+  if (!response.ok) throw new Error('Failed to fetch sub-controls for control');
+  return response.json();
+};
+
+export const createSubControl = async (subControlData: Omit<SubControl, 'id' | 'created_at' | 'updated_at'>): Promise<SubControl> => {
+  const response = await fetch(`${API_BASE}/sub-controls`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(subControlData),
+  });
+  if (!response.ok) throw new Error('Failed to create sub-control');
+  return response.json();
+};
+
+export const updateSubControl = async (id: number, subControlData: Partial<Omit<SubControl, 'id' | 'created_at'>>): Promise<void> => {
+  const response = await fetch(`${API_BASE}/sub-controls/${id}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(subControlData),
+  });
+  if (!response.ok) throw new Error('Failed to update sub-control');
+};
+
+export const deleteSubControl = async (id: number): Promise<void> => {
+  const response = await fetch(`${API_BASE}/sub-controls/${id}`, {
+    method: 'DELETE',
+  });
+  if (!response.ok) throw new Error('Failed to delete sub-control');
 };

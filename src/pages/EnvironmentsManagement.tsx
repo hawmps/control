@@ -117,21 +117,21 @@ export default function EnvironmentsManagement() {
       render: (_, item) => (
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => handleView(environment)}
+            onClick={() => handleView(item)}
             className="p-1 text-gray-400 hover:text-blue-500"
             title="View Details"
           >
             <Eye className="w-4 h-4" />
           </button>
           <button
-            onClick={() => handleEdit(environment)}
+            onClick={() => handleEdit(item)}
             className="p-1 text-gray-400 hover:text-yellow-500"
             title="Edit Environment"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
-            onClick={() => handleDelete(environment)}
+            onClick={() => handleDelete(item)}
             className="p-1 text-gray-400 hover:text-red-500"
             title="Delete Environment"
           >

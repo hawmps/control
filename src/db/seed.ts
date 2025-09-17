@@ -1,10 +1,11 @@
-import { db, items, securityControls, controlImplementations } from './index';
+import { db, items, securityControls, controlImplementations, subControls } from './index';
 
 const seedData = async () => {
   console.log('🌱 Seeding database...');
 
   // Clear existing data
   await db.delete(controlImplementations);
+  await db.delete(subControls);
   await db.delete(items);
   await db.delete(securityControls);
 
@@ -86,6 +87,154 @@ const seedData = async () => {
     }
   ]).returning();
 
+  // Insert sub-controls
+  const subControlsData = [];
+  const now = '2024-01-01T00:00:00Z';
+
+  // Access Control sub-controls
+  const accessControlId = insertedControls.find(c => c.name === 'Access Control')?.id;
+  if (accessControlId) {
+    subControlsData.push(
+      {
+        control_id: accessControlId,
+        name: 'Multi-Factor Authentication',
+        description: 'Require multiple forms of authentication for access',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: accessControlId,
+        name: 'Role-Based Access Control',
+        description: 'Assign permissions based on user roles and responsibilities',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: accessControlId,
+        name: 'Privileged Access Management',
+        description: 'Control and monitor access to privileged accounts',
+        created_at: now,
+        updated_at: now
+      }
+    );
+  }
+
+  // Data Encryption sub-controls
+  const dataEncryptionId = insertedControls.find(c => c.name === 'Data Encryption')?.id;
+  if (dataEncryptionId) {
+    subControlsData.push(
+      {
+        control_id: dataEncryptionId,
+        name: 'Data at Rest Encryption',
+        description: 'Encrypt sensitive data stored in databases and files',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: dataEncryptionId,
+        name: 'Data in Transit Encryption',
+        description: 'Encrypt data being transmitted over networks',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: dataEncryptionId,
+        name: 'Key Management',
+        description: 'Secure generation, storage, and rotation of encryption keys',
+        created_at: now,
+        updated_at: now
+      }
+    );
+  }
+
+  // Vulnerability Management sub-controls
+  const vulnMgmtId = insertedControls.find(c => c.name === 'Vulnerability Management')?.id;
+  if (vulnMgmtId) {
+    subControlsData.push(
+      {
+        control_id: vulnMgmtId,
+        name: 'Vulnerability Scanning',
+        description: 'Regular automated scanning for security vulnerabilities',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: vulnMgmtId,
+        name: 'Patch Management',
+        description: 'Timely application of security patches and updates',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: vulnMgmtId,
+        name: 'Penetration Testing',
+        description: 'Regular security testing by authorized personnel',
+        created_at: now,
+        updated_at: now
+      }
+    );
+  }
+
+  // Audit Logging sub-controls
+  const auditLoggingId = insertedControls.find(c => c.name === 'Audit Logging')?.id;
+  if (auditLoggingId) {
+    subControlsData.push(
+      {
+        control_id: auditLoggingId,
+        name: 'Security Event Logging',
+        description: 'Log all security-relevant events and activities',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: auditLoggingId,
+        name: 'Log Monitoring',
+        description: 'Real-time monitoring and analysis of security logs',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: auditLoggingId,
+        name: 'Log Retention',
+        description: 'Secure long-term storage of audit logs',
+        created_at: now,
+        updated_at: now
+      }
+    );
+  }
+
+  // Backup and Recovery sub-controls
+  const backupRecoveryId = insertedControls.find(c => c.name === 'Backup and Recovery')?.id;
+  if (backupRecoveryId) {
+    subControlsData.push(
+      {
+        control_id: backupRecoveryId,
+        name: 'Data Backup',
+        description: 'Regular automated backup of critical data',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: backupRecoveryId,
+        name: 'Disaster Recovery',
+        description: 'Procedures for recovering from major incidents',
+        created_at: now,
+        updated_at: now
+      },
+      {
+        control_id: backupRecoveryId,
+        name: 'Recovery Testing',
+        description: 'Regular testing of backup and recovery procedures',
+        created_at: now,
+        updated_at: now
+      }
+    );
+  }
+
+  if (subControlsData.length > 0) {
+    await db.insert(subControls).values(subControlsData);
+  }
+
   // Insert control implementations using actual returned IDs
   const implementationsData = [];
   
@@ -159,6 +308,7 @@ const seedData = async () => {
   console.log('✅ Database seeded successfully!');
   console.log(`- Inserted ${insertedItems.length} items`);
   console.log(`- Inserted ${insertedControls.length} security controls`);
+  console.log(`- Inserted ${subControlsData.length} sub-controls`);
   console.log(`- Inserted ${implementationsData.length} control implementations`);
 };
 

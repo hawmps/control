@@ -21,6 +21,15 @@ export const securityControls = sqliteTable('security_controls', {
   updated_at: text('updated_at').notNull()
 });
 
+export const subControls = sqliteTable('sub_controls', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  control_id: integer('control_id').notNull().references(() => securityControls.id),
+  name: text('name').notNull(),
+  description: text('description'),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull()
+});
+
 export const controlImplementations = sqliteTable('control_implementations', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   item_id: integer('item_id').notNull().references(() => items.id),
@@ -38,6 +47,14 @@ export const itemsRelations = relations(items, ({ many }) => ({
 
 export const securityControlsRelations = relations(securityControls, ({ many }) => ({
   controlImplementations: many(controlImplementations),
+  subControls: many(subControls),
+}));
+
+export const subControlsRelations = relations(subControls, ({ one }) => ({
+  control: one(securityControls, {
+    fields: [subControls.control_id],
+    references: [securityControls.id],
+  }),
 }));
 
 export const controlImplementationsRelations = relations(controlImplementations, ({ one }) => ({

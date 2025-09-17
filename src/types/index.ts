@@ -26,6 +26,15 @@ export interface SecurityControl {
   updated_at: string;
 }
 
+export interface SubControl {
+  id: number;
+  control_id: number;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ControlImplementation {
   id: number;
   item_id: number; // Will be renamed to environment_id in future migration
