@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Shield, Edit } from 'lucide-react';
 import { SearchBar, useToast, Modal, Tooltip, SubControlStatusModal } from '../components/ui';
-import { getControlMatrixData, updateControlImplementation } from '../services/securityData';
+import { getControlMatrixData, updateControlImplementation, getSubControlsByControl, getSubControlImplementationsByItem } from '../services/securityData';
 import { getStatusConfig, getStatusName } from '../utils/statusConfig';
-import type { Item, Environment, SecurityControl, ControlStatus } from '../types';
+import type { Item, Environment, SecurityControl, ControlStatus, SubControl, SubControlImplementation } from '../types';
 
 interface EnvironmentWithControlStatuses extends Environment {
   controlStatuses: Record<number, { status: string; notes: string }>;
@@ -90,7 +90,11 @@ export default function Items() {
 
 
   const handleStatusClick = (item: EnvironmentWithControlStatuses, control: SecurityControl) => {
-    // Show sub-controls modal when clicking on status indicator
+    // Show Environment Details modal when clicking on status indicator
+    setSelectedItem(item);
+    setIsItemModalOpen(true);
+
+    // Store the control info for potential status editing within the Environment Details
     setSelectedItemControl({
       item,
       control,
@@ -98,7 +102,6 @@ export default function Items() {
       currentNotes: item.controlStatuses[control.id].notes
     });
     setSelectedControl(control);
-    setIsSubControlModalOpen(true);
   };
 
 
@@ -109,14 +112,53 @@ export default function Items() {
 
   const handleEnvironmentUpdate = (updatedEnvironment: EnvironmentWithControlStatuses) => {
     // Update the main matrix data
-    const updatedEnvironments = (matrixData.environments || []).map(environment => 
+    const updatedEnvironments = (matrixData.environments || []).map(environment =>
       environment.id === updatedEnvironment.id ? updatedEnvironment : environment
     );
-    
+
     setMatrixData({
       ...matrixData,
       environments: updatedEnvironments
     });
+  };
+
+  const handleControlStatusUpdate = (itemId: number, controlId: number, newStatus: string, newNotes: string) => {
+    // Update the matrix data with the new control status
+    const updatedEnvironments = (matrixData.environments || []).map(environment => {
+      if (environment.id === itemId) {
+        return {
+          ...environment,
+          controlStatuses: {
+            ...environment.controlStatuses,
+            [controlId]: {
+              status: newStatus,
+              notes: newNotes
+            }
+          }
+        };
+      }
+      return environment;
+    });
+
+    setMatrixData({
+      ...matrixData,
+      environments: updatedEnvironments
+    });
+  };
+
+  const handleOpenSubControlModal = (control: SecurityControl, item: EnvironmentWithControlStatuses) => {
+    // Close the Environment Details modal
+    setIsItemModalOpen(false);
+
+    // Set up the SubControlStatusModal
+    setSelectedItemControl({
+      item,
+      control,
+      currentStatus: item.controlStatuses[control.id]?.status || 'red',
+      currentNotes: item.controlStatuses[control.id]?.notes || ''
+    });
+    setSelectedControl(control);
+    setIsSubControlModalOpen(true);
   };
 
 
@@ -322,6 +364,7 @@ export default function Items() {
             controls={matrixData.controls || []}
             onClose={() => setIsItemModalOpen(false)}
             onItemUpdate={handleEnvironmentUpdate}
+            onOpenSubControlModal={handleOpenSubControlModal}
           />
         )}
       </Modal>
@@ -330,11 +373,16 @@ export default function Items() {
       {selectedControl && selectedItemControl && (
         <SubControlStatusModal
           isOpen={isSubControlModalOpen}
-          onClose={() => setIsSubControlModalOpen(false)}
+          onClose={() => {
+            setIsSubControlModalOpen(false);
+            // Reopen the Environment Details modal when SubControlStatusModal closes
+            setIsItemModalOpen(true);
+          }}
           control={selectedControl}
           item={selectedItemControl.item}
           controlStatus={selectedItemControl.currentStatus}
           controlNotes={selectedItemControl.currentNotes}
+          onControlStatusUpdate={handleControlStatusUpdate}
         />
       )}
     </div>
@@ -463,17 +511,52 @@ interface ItemDetailsViewProps {
   controls: SecurityControl[];
   onClose: () => void;
   onItemUpdate: (updatedItem: EnvironmentWithControlStatuses) => void;
+  onOpenSubControlModal: (control: SecurityControl, item: EnvironmentWithControlStatuses) => void;
 }
 
-function ItemDetailsView({ item, controls, onClose, onItemUpdate }: ItemDetailsViewProps) {
+function ItemDetailsView({ item, controls, onClose, onItemUpdate, onOpenSubControlModal }: ItemDetailsViewProps) {
   const [editingNotes, setEditingNotes] = useState<{[key: string]: string}>({});
   const [localItem, setLocalItem] = useState(item);
+  const [subControlsData, setSubControlsData] = useState<{[controlId: number]: {subControls: SubControl[], implementations: SubControlImplementation[]}}>({});
   const { success } = useToast();
 
   // Update localItem when the parent item prop changes
   useEffect(() => {
     setLocalItem(item);
   }, [item]);
+
+  // Load sub-control data for all controls
+  useEffect(() => {
+    const loadSubControlData = async () => {
+      const subControlsMap: {[controlId: number]: {subControls: SubControl[], implementations: SubControlImplementation[]}} = {};
+
+      for (const control of controls) {
+        try {
+          const [subControls, implementations] = await Promise.all([
+            getSubControlsByControl(control.id),
+            getSubControlImplementationsByItem(item.id, control.id)
+          ]);
+
+          subControlsMap[control.id] = {
+            subControls,
+            implementations
+          };
+        } catch (error) {
+          console.error(`Failed to load sub-control data for control ${control.id}:`, error);
+          subControlsMap[control.id] = {
+            subControls: [],
+            implementations: []
+          };
+        }
+      }
+
+      setSubControlsData(subControlsMap);
+    };
+
+    if (controls.length > 0 && item.id) {
+      loadSubControlData();
+    }
+  }, [controls, item.id]);
 
   const getCriticalityColor = (criticality: string) => {
     switch (criticality) {
@@ -493,61 +576,25 @@ function ItemDetailsView({ item, controls, onClose, onItemUpdate }: ItemDetailsV
     });
   };
 
-  const handleNotesClick = (controlId: string) => {
-    const currentNotes = localItem.controlStatuses[controlId]?.notes || '';
-    setEditingNotes({ ...editingNotes, [controlId]: currentNotes });
-  };
-
-  const handleNotesChange = (controlId: string, value: string) => {
-    setEditingNotes({ ...editingNotes, [controlId]: value });
-  };
-
-  const handleNotesSave = async (controlId: string) => {
-    const newNotes = editingNotes[controlId] || '';
-    const currentStatus = localItem.controlStatuses[controlId]?.status || 'red';
-    
-    try {
-      // Update in database
-      await updateControlImplementation(
-        localItem.id,
-        parseInt(controlId),
-        currentStatus,
-        newNotes
-      );
-
-      // Update local state
-      const updatedItem = {
-        ...localItem,
-        controlStatuses: {
-          ...localItem.controlStatuses,
-          [controlId]: {
-            ...localItem.controlStatuses[controlId],
-            notes: newNotes
-          }
+  const handleControlStatusUpdate = (itemId: number, controlId: number, newStatus: string, newNotes: string) => {
+    // Update local state
+    const updatedItem = {
+      ...localItem,
+      controlStatuses: {
+        ...localItem.controlStatuses,
+        [controlId]: {
+          status: newStatus,
+          notes: newNotes
         }
-      };
-      
-      setLocalItem(updatedItem);
-      
-      // Update parent component
-      onItemUpdate(updatedItem);
+      }
+    };
 
-      // Clear editing state
-      const newEditingNotes = { ...editingNotes };
-      delete newEditingNotes[controlId];
-      setEditingNotes(newEditingNotes);
-
-      success(`Updated notes for ${controls.find(c => c.id === parseInt(controlId))?.name || 'control'}`);
-    } catch (error) {
-      console.error('Failed to update notes:', error);
-    }
+    setLocalItem(updatedItem);
+    onItemUpdate(updatedItem);
   };
 
-  const handleNotesCancel = (controlId: string) => {
-    const newEditingNotes = { ...editingNotes };
-    delete newEditingNotes[controlId];
-    setEditingNotes(newEditingNotes);
-  };
+
+
 
   return (
     <div className="space-y-6">
@@ -579,106 +626,113 @@ function ItemDetailsView({ item, controls, onClose, onItemUpdate }: ItemDetailsV
 
       {/* Item Properties */}
       <div className="space-y-6">
+        {/* Control Status Summary - moved to top */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Control Status Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(localItem.controlStatuses).map(([controlId, status]) => {
+              const control = controls.find(c => c.id === parseInt(controlId));
+              const controlSubData = subControlsData[parseInt(controlId)];
+
+              return (
+                <div key={controlId} className="bg-gray-50 rounded-lg p-4">
+                  {/* Master Control */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`w-5 h-5 rounded-full ${
+                          status.status === 'green' ? 'bg-green-500' :
+                          status.status === 'yellow' ? 'bg-yellow-500' :
+                          status.status === 'red' ? 'bg-red-500' :
+                          'bg-gray-300'
+                        }`}
+                      ></div>
+                      <div className="flex-1">
+                        <span className="text-sm font-bold text-gray-900">
+                          {control?.name || `Control ${controlId}`}
+                        </span>
+                        {control?.description && (
+                          <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                            {control.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Edit Status Button */}
+                    <button
+                      onClick={() => {
+                        if (control) {
+                          onOpenSubControlModal(control, localItem);
+                        }
+                      }}
+                      className="inline-flex items-center px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      title="Edit status and sub-controls"
+                    >
+                      Edit Status
+                    </button>
+                  </div>
+
+                  {/* Sub-Controls */}
+                  {controlSubData && controlSubData.subControls.length > 0 && (
+                    <div className="mt-3 pl-4 border-l-2 border-gray-200">
+                      <div className="text-xs font-medium text-gray-600 mb-2">Sub-Controls:</div>
+                      <div className="space-y-2">
+                        {controlSubData.subControls.map((subControl) => {
+                          const implementation = controlSubData.implementations.find(
+                            impl => impl.sub_control_id === subControl.id
+                          );
+                          const subStatus = implementation?.status || 'red';
+
+                          return (
+                            <div key={subControl.id} className="flex items-center space-x-2">
+                              <div className={`w-3 h-3 rounded-full ${
+                                subStatus === 'green' ? 'bg-green-500' :
+                                subStatus === 'yellow' ? 'bg-yellow-500' :
+                                subStatus === 'red' ? 'bg-red-500' :
+                                'bg-gray-300'
+                              }`}></div>
+                              <span className="text-xs text-gray-700 flex-1">
+                                {subControl.name}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Environment Information - moved to bottom */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Environment Information</h3>
-          
+
           {item.item_type && (
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm font-medium text-gray-500">Type:</span>
               <span className="text-sm text-gray-900">{item.item_type}</span>
             </div>
           )}
-          
+
           {item.owner && (
             <div className="flex justify-between py-2 border-b border-gray-100">
               <span className="text-sm font-medium text-gray-500">Owner:</span>
               <span className="text-sm text-gray-900">{item.owner}</span>
             </div>
           )}
-          
+
           <div className="flex justify-between py-2 border-b border-gray-100">
             <span className="text-sm font-medium text-gray-500">Created:</span>
             <span className="text-sm text-gray-900">{formatDate(item.created_at)}</span>
           </div>
-          
+
           <div className="flex justify-between py-2 border-b border-gray-100">
             <span className="text-sm font-medium text-gray-500">Last Updated:</span>
             <span className="text-sm text-gray-900">{formatDate(item.updated_at)}</span>
-          </div>
-        </div>
-
-        {/* Control Status Summary */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Control Status Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(localItem.controlStatuses).map(([controlId, status]) => {
-              const control = controls.find(c => c.id === parseInt(controlId));
-              const isEditing = editingNotes.hasOwnProperty(controlId);
-              
-              return (
-                <div key={controlId} className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <div className={`w-4 h-4 rounded-full ${
-                      status.status === 'green' ? 'bg-green-500' :
-                      status.status === 'yellow' ? 'bg-yellow-500' :
-                      status.status === 'red' ? 'bg-red-500' :
-                      status.status === 'unknown' ? 'bg-gray-300' :
-                      'bg-gray-300'
-                    }`}></div>
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-gray-900 line-clamp-2">
-                        {control?.name || `Control ${controlId}`}
-                      </span>
-                      {control?.description && (
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-                          {control.description}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-3">
-                    <span className="font-medium text-sm text-gray-700">Notes:</span>
-                    {isEditing ? (
-                      <div className="mt-2 space-y-2">
-                        <textarea
-                          value={editingNotes[controlId]}
-                          onChange={(e) => handleNotesChange(controlId, e.target.value)}
-                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                          rows={3}
-                          placeholder="Add notes about the implementation..."
-                          autoFocus
-                        />
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleNotesSave(controlId)}
-                            className="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => handleNotesCancel(controlId)}
-                            className="px-3 py-1 text-xs bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div
-                        onClick={() => handleNotesClick(controlId)}
-                        className="mt-1 text-sm text-gray-600 cursor-pointer hover:bg-gray-100 rounded p-1 transition-colors min-h-[2rem] flex items-start"
-                        title="Click to edit notes"
-                      >
-                        {status.notes || (
-                          <span className="text-gray-400 italic">Click to add notes...</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>
@@ -692,6 +746,7 @@ function ItemDetailsView({ item, controls, onClose, onItemUpdate }: ItemDetailsV
           Close
         </button>
       </div>
+
     </div>
   );
 }

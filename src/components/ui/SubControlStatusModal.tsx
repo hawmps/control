@@ -16,6 +16,7 @@ interface SubControlStatusModalProps {
   item: Item;
   controlStatus: string;
   controlNotes: string;
+  onControlStatusUpdate?: (itemId: number, controlId: number, newStatus: string, newNotes: string) => void;
 }
 
 interface SubControlWithImplementation extends SubControl {
@@ -30,7 +31,8 @@ export function SubControlStatusModal({
   control,
   item,
   controlStatus,
-  controlNotes
+  controlNotes,
+  onControlStatusUpdate
 }: SubControlStatusModalProps) {
   const [subControls, setSubControls] = useState<SubControlWithImplementation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -125,6 +127,11 @@ export function SubControlStatusModal({
         setMasterControlStatus('yellow');
         setMasterControlNotes(newNotes);
         setTempMasterNotes(newNotes);
+
+        // Notify parent component of the change
+        if (onControlStatusUpdate) {
+          onControlStatusUpdate(item.id, control.id, 'yellow', newNotes);
+        }
       } catch (error) {
         console.error('Failed to update parent control status:', error);
       }
@@ -143,6 +150,11 @@ export function SubControlStatusModal({
     try {
       await updateControlImplementation(item.id, control.id, newStatus, masterControlNotes);
       setMasterControlStatus(newStatus);
+
+      // Notify parent component of the change
+      if (onControlStatusUpdate) {
+        onControlStatusUpdate(item.id, control.id, newStatus, masterControlNotes);
+      }
     } catch (error) {
       console.error('Failed to update master control status:', error);
     }
@@ -158,6 +170,11 @@ export function SubControlStatusModal({
       await updateControlImplementation(item.id, control.id, masterControlStatus, tempMasterNotes);
       setMasterControlNotes(tempMasterNotes);
       setIsEditingMasterNotes(false);
+
+      // Notify parent component of the change
+      if (onControlStatusUpdate) {
+        onControlStatusUpdate(item.id, control.id, masterControlStatus, tempMasterNotes);
+      }
     } catch (error) {
       console.error('Failed to update master control notes:', error);
     }
@@ -367,9 +384,16 @@ export function SubControlStatusModal({
               {subControls.map((subControl) => (
                 <div key={subControl.id} className="bg-white border border-gray-200 rounded-lg p-4">
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Left side - Name and Status */}
+                    {/* Left side - Name, Description, and Status */}
                     <div>
-                      <h4 className="font-medium text-gray-900 mb-3">{subControl.name}</h4>
+                      <h4 className="font-medium text-gray-900 mb-2">{subControl.name}</h4>
+
+                      {/* Sub-control description */}
+                      {subControl.description && (
+                        <p className="text-sm text-gray-600 mb-3 leading-relaxed">
+                          {subControl.description}
+                        </p>
+                      )}
 
                       {/* Status selector */}
                       <div>

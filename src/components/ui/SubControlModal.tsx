@@ -103,7 +103,7 @@ export function SubControlModal({ isOpen, onClose, control }: SubControlModalPro
         if (row?.isEditing) {
           return <EditableCell
             value={value}
-            onSave={(newValue) => handleSaveEdit(row.id, newValue, row.description || '')}
+            onSave={(newName, newDescription) => handleSaveEdit(row.id, newName, newDescription)}
             onCancel={() => handleCancelEdit()}
             description={row.description || ''}
           />;
@@ -250,7 +250,7 @@ export function SubControlModal({ isOpen, onClose, control }: SubControlModalPro
 interface EditableCellProps {
   value: string;
   description: string;
-  onSave: (name: string) => void;
+  onSave: (name: string, description: string) => void;
   onCancel: () => void;
 }
 
@@ -260,7 +260,7 @@ function EditableCell({ value, description, onSave, onCancel }: EditableCellProp
 
   const handleSave = () => {
     if (name.trim()) {
-      onSave(name.trim());
+      onSave(name.trim(), desc);
     }
   };
 
