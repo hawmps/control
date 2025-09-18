@@ -41,3 +41,9 @@ build/
 # Cache directories
 .cache/
 .parcel-cache/
+
+# Database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

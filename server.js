@@ -128,8 +128,162 @@ app.put('/api/controls/:id', async (req, res) => {
 
 app.delete('/api/controls/:id', async (req, res) => {
   try {
+    await db.delete(schema.subControls).where(eq(schema.subControls.control_id, parseInt(req.params.id)));
     await db.delete(schema.controlImplementations).where(eq(schema.controlImplementations.control_id, parseInt(req.params.id)));
     await db.delete(schema.securityControls).where(eq(schema.securityControls.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sub-Controls
+app.get('/api/sub-controls', async (req, res) => {
+  try {
+    const subControls = await db.select().from(schema.subControls);
+    res.json(subControls);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/sub-controls/control/:controlId', async (req, res) => {
+  try {
+    const subControls = await db.select()
+      .from(schema.subControls)
+      .where(eq(schema.subControls.control_id, parseInt(req.params.controlId)));
+    res.json(subControls);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/sub-controls', async (req, res) => {
+  try {
+    const [newSubControl] = await db.insert(schema.subControls).values({
+      ...req.body,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).returning();
+    res.json(newSubControl);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/sub-controls/:id', async (req, res) => {
+  try {
+    await db.update(schema.subControls)
+      .set({
+        ...req.body,
+        updated_at: new Date().toISOString()
+      })
+      .where(eq(schema.subControls.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/sub-controls/:id', async (req, res) => {
+  try {
+    // Delete related implementations first
+    await db.delete(schema.subControlImplementations).where(eq(schema.subControlImplementations.sub_control_id, parseInt(req.params.id)));
+    await db.delete(schema.subControls).where(eq(schema.subControls.id, parseInt(req.params.id)));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sub-Control Implementations
+app.get('/api/sub-control-implementations', async (req, res) => {
+  try {
+    const implementations = await db.select().from(schema.subControlImplementations);
+    res.json(implementations);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/sub-control-implementations/item/:itemId/control/:controlId', async (req, res) => {
+  try {
+    const itemId = parseInt(req.params.itemId);
+    const controlId = parseInt(req.params.controlId);
+
+    // Get all sub-controls for this control
+    const subControls = await db.select()
+      .from(schema.subControls)
+      .where(eq(schema.subControls.control_id, controlId));
+
+    // Get all implementations for this item
+    const implementations = await db.select()
+      .from(schema.subControlImplementations)
+      .where(eq(schema.subControlImplementations.item_id, itemId));
+
+    // Filter implementations to only include ones for sub-controls of this control
+    const subControlIds = subControls.map(sc => sc.id);
+    const relevantImplementations = implementations.filter(impl =>
+      subControlIds.includes(impl.sub_control_id)
+    );
+
+    res.json(relevantImplementations);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/sub-control-implementations', async (req, res) => {
+  try {
+    const [newImplementation] = await db.insert(schema.subControlImplementations).values({
+      ...req.body,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).returning();
+    res.json(newImplementation);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/sub-control-implementations/:itemId/:subControlId', async (req, res) => {
+  try {
+    const { status, notes } = req.body;
+    const itemId = parseInt(req.params.itemId);
+    const subControlId = parseInt(req.params.subControlId);
+
+    // Check if implementation exists
+    const existing = await db.select()
+      .from(schema.subControlImplementations)
+      .where(and(
+        eq(schema.subControlImplementations.item_id, itemId),
+        eq(schema.subControlImplementations.sub_control_id, subControlId)
+      ));
+
+    if (existing.length > 0) {
+      // Update existing
+      await db.update(schema.subControlImplementations)
+        .set({
+          status,
+          notes,
+          updated_at: new Date().toISOString()
+        })
+        .where(and(
+          eq(schema.subControlImplementations.item_id, itemId),
+          eq(schema.subControlImplementations.sub_control_id, subControlId)
+        ));
+    } else {
+      // Create new
+      await db.insert(schema.subControlImplementations).values({
+        item_id: itemId,
+        sub_control_id: subControlId,
+        status,
+        notes,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: error.message });

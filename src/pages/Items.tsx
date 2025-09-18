@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Shield, Edit } from 'lucide-react';
-import { SearchBar, useToast, Modal, Tooltip, SubControlModal } from '../components/ui';
+import { SearchBar, useToast, Modal, Tooltip, SubControlStatusModal } from '../components/ui';
 import { getControlMatrixData, updateControlImplementation } from '../services/securityData';
 import { getStatusConfig, getStatusName } from '../utils/statusConfig';
 import type { Item, Environment, SecurityControl, ControlStatus } from '../types';
@@ -18,7 +18,6 @@ export default function Items() {
   const [matrixData, setMatrixData] = useState<MatrixData>({ controls: [], environments: [] });
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [selectedItemControl, setSelectedItemControl] = useState<{
     item: EnvironmentWithControlStatuses;
     control: SecurityControl;
@@ -90,30 +89,18 @@ export default function Items() {
   };
 
 
-  const handleStatusClick = (item: EnvironmentWithControlStatuses, control: SecurityControl, event: React.MouseEvent) => {
-    // If it's a right-click or ctrl+click, show sub-controls modal
-    if (event.ctrlKey || event.metaKey || event.button === 2) {
-      event.preventDefault();
-      setSelectedControl(control);
-      setIsSubControlModalOpen(true);
-      return;
-    }
-
-    // Regular click shows status edit modal
-    const controlStatus = item.controlStatuses[control.id];
+  const handleStatusClick = (item: EnvironmentWithControlStatuses, control: SecurityControl) => {
+    // Show sub-controls modal when clicking on status indicator
     setSelectedItemControl({
       item,
       control,
-      currentStatus: controlStatus.status,
-      currentNotes: controlStatus.notes
+      currentStatus: item.controlStatuses[control.id].status,
+      currentNotes: item.controlStatuses[control.id].notes
     });
-    setIsStatusModalOpen(true);
-  };
-
-  const handleSubControlClick = (control: SecurityControl) => {
     setSelectedControl(control);
     setIsSubControlModalOpen(true);
   };
+
 
   const handleEnvironmentClick = (environment: EnvironmentWithControlStatuses) => {
     setSelectedItem(environment);
@@ -132,47 +119,6 @@ export default function Items() {
     });
   };
 
-  const handleStatusUpdate = async (newStatus: string, newNotes: string) => {
-    if (!selectedItemControl) return;
-
-    try {
-      // Update in database
-      await updateControlImplementation(
-        selectedItemControl.item.id,
-        selectedItemControl.control.id,
-        newStatus,
-        newNotes
-      );
-
-      // Update local state
-      const updatedEnvironments = (matrixData.environments || []).map(environment => {
-        if (environment.id === selectedItemControl.item.id) {
-          return {
-            ...environment,
-            controlStatuses: {
-              ...environment.controlStatuses,
-              [selectedItemControl.control.id]: {
-                status: newStatus,
-                notes: newNotes
-              }
-            }
-          };
-        }
-        return environment;
-      });
-
-      setMatrixData({
-        ...matrixData,
-        environments: updatedEnvironments
-      });
-
-      setIsStatusModalOpen(false);
-      success(`Updated ${selectedItemControl.control.name} status for ${selectedItemControl.item.name}`);
-    } catch (error) {
-      console.error('Failed to update control implementation:', error);
-      // You could show an error toast here
-    }
-  };
 
   // Calculate overall statistics
   const totalEnvironments = (matrixData.environments || []).length;
@@ -314,14 +260,11 @@ export default function Items() {
                   {(matrixData.controls || []).map((control) => (
                     <th key={control.id} className="px-4 py-4 text-center text-sm font-medium text-gray-900 border-r border-gray-200">
                       <Tooltip
-                        content={`${control.description || control.name} (Click to view sub-controls)`}
+                        content={control.description || control.name}
                         position="bottom"
-                        className="min-w-[140px] whitespace-normal leading-tight"
+                        className="min-w-[140px] whitespace-normal leading-tight cursor-help"
                       >
-                        <div
-                          className="cursor-pointer hover:text-blue-600 hover:underline transition-colors"
-                          onClick={() => handleSubControlClick(control)}
-                        >
+                        <div>
                           {control.name}
                         </div>
                       </Tooltip>
@@ -348,9 +291,8 @@ export default function Items() {
                           <div className="min-w-[140px] flex justify-center">
                             <div
                               className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm cursor-pointer hover:scale-110 transition-transform ${getStatusColor(controlStatus.status)}`}
-                              title={`${control.name}: ${controlStatus.notes} (Click to edit, Ctrl+Click for sub-controls)`}
-                              onClick={(e) => handleStatusClick(environment, control, e)}
-                              onContextMenu={(e) => handleStatusClick(environment, control, e)}
+                              title={`${control.name}: ${controlStatus.notes} (Click to view sub-controls)`}
+                              onClick={() => handleStatusClick(environment, control)}
                             >
                               {getStatusIcon(controlStatus.status)}
                             </div>
@@ -366,23 +308,6 @@ export default function Items() {
         )}
       </div>
 
-      {/* Status Edit Modal */}
-      <Modal
-        isOpen={isStatusModalOpen}
-        onClose={() => setIsStatusModalOpen(false)}
-        title="Edit Control Status"
-      >
-        {selectedItemControl && (
-          <StatusEditForm
-            item={selectedItemControl.item}
-            control={selectedItemControl.control}
-            currentStatus={selectedItemControl.currentStatus}
-            currentNotes={selectedItemControl.currentNotes}
-            onSave={handleStatusUpdate}
-            onCancel={() => setIsStatusModalOpen(false)}
-          />
-        )}
-      </Modal>
 
       {/* Environment Details Modal */}
       <Modal
@@ -401,12 +326,15 @@ export default function Items() {
         )}
       </Modal>
 
-      {/* Sub-Controls Modal */}
-      {selectedControl && (
-        <SubControlModal
+      {/* Sub-Controls Status Modal */}
+      {selectedControl && selectedItemControl && (
+        <SubControlStatusModal
           isOpen={isSubControlModalOpen}
           onClose={() => setIsSubControlModalOpen(false)}
           control={selectedControl}
+          item={selectedItemControl.item}
+          controlStatus={selectedItemControl.currentStatus}
+          controlNotes={selectedItemControl.currentNotes}
         />
       )}
     </div>

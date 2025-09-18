@@ -22,6 +22,7 @@ export function SubControlModal({ isOpen, onClose, control }: SubControlModalPro
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+
   const loadSubControls = async () => {
     if (!isOpen || !control.id) return;
 

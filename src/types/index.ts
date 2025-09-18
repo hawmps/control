@@ -45,6 +45,16 @@ export interface ControlImplementation {
   updated_at: string;
 }
 
+export interface SubControlImplementation {
+  id: number;
+  item_id: number;
+  sub_control_id: number;
+  status: ControlStatus;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Document {
   id: number;
   title: string;

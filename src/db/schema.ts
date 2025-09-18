@@ -40,9 +40,20 @@ export const controlImplementations = sqliteTable('control_implementations', {
   updated_at: text('updated_at').notNull()
 });
 
+export const subControlImplementations = sqliteTable('sub_control_implementations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  item_id: integer('item_id').notNull().references(() => items.id),
+  sub_control_id: integer('sub_control_id').notNull().references(() => subControls.id),
+  status: text('status').notNull(), // 'red', 'yellow', 'green'
+  notes: text('notes'),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull()
+});
+
 // Relations
 export const itemsRelations = relations(items, ({ many }) => ({
   controlImplementations: many(controlImplementations),
+  subControlImplementations: many(subControlImplementations),
 }));
 
 export const securityControlsRelations = relations(securityControls, ({ many }) => ({
@@ -50,10 +61,22 @@ export const securityControlsRelations = relations(securityControls, ({ many }) 
   subControls: many(subControls),
 }));
 
-export const subControlsRelations = relations(subControls, ({ one }) => ({
+export const subControlsRelations = relations(subControls, ({ one, many }) => ({
   control: one(securityControls, {
     fields: [subControls.control_id],
     references: [securityControls.id],
+  }),
+  subControlImplementations: many(subControlImplementations),
+}));
+
+export const subControlImplementationsRelations = relations(subControlImplementations, ({ one }) => ({
+  item: one(items, {
+    fields: [subControlImplementations.item_id],
+    references: [items.id],
+  }),
+  subControl: one(subControls, {
+    fields: [subControlImplementations.sub_control_id],
+    references: [subControls.id],
   }),
 }));
 

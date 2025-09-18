@@ -1,9 +1,10 @@
-import { db, items, securityControls, controlImplementations, subControls } from './index';
+import { db, items, securityControls, controlImplementations, subControls, subControlImplementations } from './index';
 
 const seedData = async () => {
   console.log('🌱 Seeding database...');
 
   // Clear existing data
+  await db.delete(subControlImplementations);
   await db.delete(controlImplementations);
   await db.delete(subControls);
   await db.delete(items);
@@ -231,8 +232,116 @@ const seedData = async () => {
     );
   }
 
-  if (subControlsData.length > 0) {
-    await db.insert(subControls).values(subControlsData);
+  const insertedSubControls = subControlsData.length > 0
+    ? await db.insert(subControls).values(subControlsData).returning()
+    : [];
+
+  // Insert sub-control implementations
+  const subControlImplementationsData = [];
+
+  // Sample sub-control implementations for each item
+  for (const item of insertedItems) {
+    for (const subControl of insertedSubControls) {
+      // Vary the status based on item criticality and sub-control type
+      let status = 'green';
+      let notes = '';
+
+      // Customer Portal (high criticality) - mostly good implementation
+      if (item.name === 'Customer Portal Web Application') {
+        if (subControl.name.includes('Multi-Factor')) {
+          status = 'green';
+          notes = 'Okta MFA implemented for all user accounts';
+        } else if (subControl.name.includes('Data at Rest')) {
+          status = 'green';
+          notes = 'AES-256 encryption on all databases';
+        } else if (subControl.name.includes('Vulnerability Scanning')) {
+          status = 'yellow';
+          notes = 'Weekly Nessus scans, working on daily automation';
+        } else if (subControl.name.includes('Log Monitoring')) {
+          status = 'green';
+          notes = 'Splunk monitoring with real-time alerts';
+        } else if (subControl.name.includes('Data Backup')) {
+          status = 'yellow';
+          notes = 'Daily backups configured, testing restore procedures';
+        } else {
+          status = 'green';
+          notes = 'Fully implemented and operational';
+        }
+      }
+
+      // Payment System (critical) - excellent implementation
+      else if (item.name === 'Payment Processing System') {
+        if (subControl.name.includes('Key Management')) {
+          status = 'green';
+          notes = 'HSM-based key management with FIPS 140-2 Level 3';
+        } else if (subControl.name.includes('Penetration Testing')) {
+          status = 'green';
+          notes = 'Quarterly pen tests by certified third party';
+        } else if (subControl.name.includes('Recovery Testing')) {
+          status = 'green';
+          notes = 'Monthly DR tests with full failover validation';
+        } else {
+          status = 'green';
+          notes = 'PCI DSS compliant implementation';
+        }
+      }
+
+      // Employee Database (high criticality) - mixed implementation
+      else if (item.name === 'Employee Database') {
+        if (subControl.name.includes('Privileged Access')) {
+          status = 'yellow';
+          notes = 'CyberArk PAM in pilot phase, not fully deployed';
+        } else if (subControl.name.includes('Patch Management')) {
+          status = 'red';
+          notes = 'Manual patching process, automation pending';
+        } else if (subControl.name.includes('Data Backup')) {
+          status = 'red';
+          notes = 'Backup infrastructure needs budget approval';
+        } else if (subControl.name.includes('Security Event')) {
+          status = 'green';
+          notes = 'SIEM monitoring all HR database access';
+        } else {
+          status = 'yellow';
+          notes = 'Partially implemented, improvements needed';
+        }
+      }
+
+      // Marketing Website (medium criticality) - basic implementation
+      else if (item.name === 'Marketing Website') {
+        if (subControl.name.includes('Multi-Factor')) {
+          status = 'red';
+          notes = 'Basic auth only, MFA planned for Q2';
+        } else if (subControl.name.includes('Data at Rest')) {
+          status = 'green';
+          notes = 'Static site, no sensitive data stored';
+        } else if (subControl.name.includes('Vulnerability Scanning')) {
+          status = 'yellow';
+          notes = 'Monthly scans, some findings pending remediation';
+        } else if (subControl.name.includes('Log Monitoring')) {
+          status = 'yellow';
+          notes = 'Basic CloudWatch logs, enhancing monitoring';
+        } else if (subControl.name.includes('Data Backup')) {
+          status = 'green';
+          notes = 'Automated S3 backups with versioning';
+        } else {
+          status = 'yellow';
+          notes = 'Basic implementation in place';
+        }
+      }
+
+      subControlImplementationsData.push({
+        item_id: item.id,
+        sub_control_id: subControl.id,
+        status,
+        notes,
+        created_at: now,
+        updated_at: now
+      });
+    }
+  }
+
+  if (subControlImplementationsData.length > 0) {
+    await db.insert(subControlImplementations).values(subControlImplementationsData);
   }
 
   // Insert control implementations using actual returned IDs
@@ -309,6 +418,7 @@ const seedData = async () => {
   console.log(`- Inserted ${insertedItems.length} items`);
   console.log(`- Inserted ${insertedControls.length} security controls`);
   console.log(`- Inserted ${subControlsData.length} sub-controls`);
+  console.log(`- Inserted ${subControlImplementationsData.length} sub-control implementations`);
   console.log(`- Inserted ${implementationsData.length} control implementations`);
 };
 

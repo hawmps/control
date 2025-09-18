@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Shield, Edit, Trash2, Eye } from 'lucide-react';
-import { DataTable, SearchBar, useToast, Modal } from '../components/ui';
-import { getSecurityControls, createSecurityControl, updateSecurityControl, deleteSecurityControl } from '../services/securityData';
-import type { SecurityControl, Column } from '../types';
+import { Plus, Shield, Edit, Trash2, Eye, Settings } from 'lucide-react';
+import { DataTable, SearchBar, useToast, Modal, SubControlModal } from '../components/ui';
+import { getSecurityControls, createSecurityControl, updateSecurityControl, deleteSecurityControl, getSubControlsByControl } from '../services/securityData';
+import type { SecurityControl, Column, SubControl } from '../types';
 
 export default function Controls() {
   const [controls, setControls] = useState<SecurityControl[]>([]);
@@ -12,6 +12,7 @@ export default function Controls() {
   const [selectedControl, setSelectedControl] = useState<SecurityControl | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isSubControlModalOpen, setIsSubControlModalOpen] = useState(false);
   const { success } = useToast();
 
   useEffect(() => {
@@ -42,6 +43,11 @@ export default function Controls() {
   const handleView = (control: SecurityControl) => {
     setSelectedControl(control);
     setIsViewModalOpen(true);
+  };
+
+  const handleManageSubControls = (control: SecurityControl) => {
+    setSelectedControl(control);
+    setIsSubControlModalOpen(true);
   };
 
   const handleDelete = async (control: SecurityControl) => {
@@ -89,6 +95,13 @@ export default function Controls() {
             title="View Details"
           >
             <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleManageSubControls(control)}
+            className="p-1 text-gray-400 hover:text-purple-500"
+            title="Manage Sub-Controls"
+          >
+            <Settings className="w-4 h-4" />
           </button>
           <button
             onClick={() => handleEdit(control)}
@@ -268,6 +281,15 @@ export default function Controls() {
           />
         )}
       </Modal>
+
+      {/* Sub-Controls Management Modal */}
+      {selectedControl && (
+        <SubControlModal
+          isOpen={isSubControlModalOpen}
+          onClose={() => setIsSubControlModalOpen(false)}
+          control={selectedControl}
+        />
+      )}
     </div>
   );
 }
@@ -348,6 +370,26 @@ interface ControlDetailsProps {
 }
 
 function ControlDetails({ control, onClose }: ControlDetailsProps) {
+  const [subControls, setSubControls] = useState<SubControl[]>([]);
+  const [loadingSubControls, setLoadingSubControls] = useState(true);
+
+  useEffect(() => {
+    const loadSubControls = async () => {
+      try {
+        setLoadingSubControls(true);
+        const data = await getSubControlsByControl(control.id);
+        setSubControls(data);
+      } catch (error) {
+        console.error('Failed to load sub-controls:', error);
+        setSubControls([]);
+      } finally {
+        setLoadingSubControls(false);
+      }
+    };
+
+    loadSubControls();
+  }, [control.id]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center">
@@ -369,7 +411,34 @@ function ControlDetails({ control, onClose }: ControlDetailsProps) {
             <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
             <dd className="text-sm text-gray-900">{new Date(control.updated_at).toLocaleString()}</dd>
           </div>
+          <div>
+            <dt className="text-sm font-medium text-gray-500">Sub-Controls</dt>
+            <dd className="text-sm text-gray-900">{subControls.length} defined</dd>
+          </div>
         </dl>
+      </div>
+
+      {/* Sub-controls list */}
+      <div>
+        <h4 className="font-medium text-gray-900 mb-3">Sub-Controls</h4>
+        {loadingSubControls ? (
+          <div className="text-sm text-gray-500">Loading sub-controls...</div>
+        ) : subControls.length > 0 ? (
+          <div className="space-y-3">
+            {subControls.map((subControl) => (
+              <div key={subControl.id} className="bg-gray-50 rounded-lg p-3">
+                <div className="font-medium text-sm text-gray-900">{subControl.name}</div>
+                {subControl.description && (
+                  <div className="text-xs text-gray-600 mt-1">{subControl.description}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-500 italic">
+            No sub-controls defined. Use the "Manage Sub-Controls" button to add some.
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end pt-4">

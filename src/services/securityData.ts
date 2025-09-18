@@ -1,4 +1,4 @@
-import type { Item, Environment, SecurityControl, ControlImplementation, SubControl } from '../types';
+import type { Item, Environment, SecurityControl, ControlImplementation, SubControl, SubControlImplementation } from '../types';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -301,4 +301,40 @@ export const deleteSubControl = async (id: number): Promise<void> => {
     method: 'DELETE',
   });
   if (!response.ok) throw new Error('Failed to delete sub-control');
+};
+
+// Sub-control implementation service functions
+export const getSubControlImplementations = async (): Promise<SubControlImplementation[]> => {
+  const response = await fetch(`${API_BASE}/sub-control-implementations`);
+  if (!response.ok) throw new Error('Failed to fetch sub-control implementations');
+  return response.json();
+};
+
+export const getSubControlImplementationsByItem = async (itemId: number, controlId: number): Promise<SubControlImplementation[]> => {
+  const response = await fetch(`${API_BASE}/sub-control-implementations/item/${itemId}/control/${controlId}`);
+  if (!response.ok) throw new Error('Failed to fetch sub-control implementations for item');
+  return response.json();
+};
+
+export const updateSubControlImplementation = async (itemId: number, subControlId: number, status: string, notes: string): Promise<void> => {
+  const response = await fetch(`${API_BASE}/sub-control-implementations/${itemId}/${subControlId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ status, notes }),
+  });
+  if (!response.ok) throw new Error('Failed to update sub-control implementation');
+};
+
+export const createSubControlImplementation = async (implementationData: Omit<SubControlImplementation, 'id' | 'created_at' | 'updated_at'>): Promise<SubControlImplementation> => {
+  const response = await fetch(`${API_BASE}/sub-control-implementations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(implementationData),
+  });
+  if (!response.ok) throw new Error('Failed to create sub-control implementation');
+  return response.json();
 };

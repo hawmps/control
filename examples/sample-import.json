@@ -214,6 +214,535 @@
         "created_at": "2024-01-10T09:15:00Z",
         "updated_at": "2024-02-01T10:00:00Z"
       }
+    ],
+    "subControls": [
+      {
+        "id": 1,
+        "control_id": 1,
+        "name": "Multi-Factor Authentication",
+        "description": "Require multiple forms of authentication for access",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "control_id": 1,
+        "name": "Role-Based Access Control",
+        "description": "Assign permissions based on user roles and responsibilities",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 3,
+        "control_id": 1,
+        "name": "Privileged Access Management",
+        "description": "Control and monitor access to privileged accounts",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 4,
+        "control_id": 2,
+        "name": "Data at Rest Encryption",
+        "description": "Encrypt sensitive data stored in databases and files",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 5,
+        "control_id": 2,
+        "name": "Data in Transit Encryption",
+        "description": "Encrypt data being transmitted over networks",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 6,
+        "control_id": 2,
+        "name": "Key Management",
+        "description": "Secure generation, storage, and rotation of encryption keys",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 7,
+        "control_id": 3,
+        "name": "Vulnerability Scanning",
+        "description": "Regular automated scanning for security vulnerabilities",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 8,
+        "control_id": 3,
+        "name": "Patch Management",
+        "description": "Timely application of security patches and updates",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 9,
+        "control_id": 3,
+        "name": "Penetration Testing",
+        "description": "Regular security testing by authorized personnel",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 10,
+        "control_id": 4,
+        "name": "Security Event Logging",
+        "description": "Log all security-relevant events and activities",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 11,
+        "control_id": 4,
+        "name": "Log Monitoring",
+        "description": "Real-time monitoring and analysis of security logs",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 12,
+        "control_id": 4,
+        "name": "Log Retention",
+        "description": "Secure long-term storage of audit logs",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 13,
+        "control_id": 5,
+        "name": "Data Backup",
+        "description": "Regular automated backup of critical data",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 14,
+        "control_id": 5,
+        "name": "Disaster Recovery",
+        "description": "Procedures for recovering from major incidents",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 15,
+        "control_id": 5,
+        "name": "Recovery Testing",
+        "description": "Regular testing of backup and recovery procedures",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "subControlImplementations": [
+      {
+        "id": 1,
+        "item_id": 1,
+        "sub_control_id": 1,
+        "status": "green",
+        "notes": "Okta MFA implemented for all user accounts",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "item_id": 1,
+        "sub_control_id": 2,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 3,
+        "item_id": 1,
+        "sub_control_id": 3,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 4,
+        "item_id": 1,
+        "sub_control_id": 4,
+        "status": "green",
+        "notes": "AES-256 encryption on all databases",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 5,
+        "item_id": 1,
+        "sub_control_id": 5,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 6,
+        "item_id": 1,
+        "sub_control_id": 6,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 7,
+        "item_id": 1,
+        "sub_control_id": 7,
+        "status": "yellow",
+        "notes": "Weekly Nessus scans, working on daily automation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 8,
+        "item_id": 1,
+        "sub_control_id": 8,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 9,
+        "item_id": 1,
+        "sub_control_id": 9,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 10,
+        "item_id": 1,
+        "sub_control_id": 10,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 11,
+        "item_id": 1,
+        "sub_control_id": 11,
+        "status": "green",
+        "notes": "Splunk monitoring with real-time alerts",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 12,
+        "item_id": 1,
+        "sub_control_id": 12,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 13,
+        "item_id": 1,
+        "sub_control_id": 13,
+        "status": "yellow",
+        "notes": "Daily backups configured, testing restore procedures",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 14,
+        "item_id": 1,
+        "sub_control_id": 14,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 15,
+        "item_id": 1,
+        "sub_control_id": 15,
+        "status": "green",
+        "notes": "Fully implemented and operational",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 16,
+        "item_id": 2,
+        "sub_control_id": 1,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 17,
+        "item_id": 2,
+        "sub_control_id": 2,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 18,
+        "item_id": 2,
+        "sub_control_id": 3,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 19,
+        "item_id": 2,
+        "sub_control_id": 4,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 20,
+        "item_id": 2,
+        "sub_control_id": 5,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 21,
+        "item_id": 2,
+        "sub_control_id": 6,
+        "status": "green",
+        "notes": "HSM-based key management with FIPS 140-2 Level 3",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 22,
+        "item_id": 2,
+        "sub_control_id": 7,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 23,
+        "item_id": 2,
+        "sub_control_id": 8,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 24,
+        "item_id": 2,
+        "sub_control_id": 9,
+        "status": "green",
+        "notes": "Quarterly pen tests by certified third party",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 25,
+        "item_id": 2,
+        "sub_control_id": 10,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 26,
+        "item_id": 2,
+        "sub_control_id": 11,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 27,
+        "item_id": 2,
+        "sub_control_id": 12,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 28,
+        "item_id": 2,
+        "sub_control_id": 13,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 29,
+        "item_id": 2,
+        "sub_control_id": 14,
+        "status": "green",
+        "notes": "PCI DSS compliant implementation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 30,
+        "item_id": 2,
+        "sub_control_id": 15,
+        "status": "green",
+        "notes": "Monthly DR tests with full failover validation",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 31,
+        "item_id": 3,
+        "sub_control_id": 1,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 32,
+        "item_id": 3,
+        "sub_control_id": 2,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 33,
+        "item_id": 3,
+        "sub_control_id": 3,
+        "status": "yellow",
+        "notes": "CyberArk PAM in pilot phase, not fully deployed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 34,
+        "item_id": 3,
+        "sub_control_id": 4,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 35,
+        "item_id": 3,
+        "sub_control_id": 5,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 36,
+        "item_id": 3,
+        "sub_control_id": 6,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 37,
+        "item_id": 3,
+        "sub_control_id": 7,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 38,
+        "item_id": 3,
+        "sub_control_id": 8,
+        "status": "red",
+        "notes": "Manual patching process, automation pending",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 39,
+        "item_id": 3,
+        "sub_control_id": 9,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 40,
+        "item_id": 3,
+        "sub_control_id": 10,
+        "status": "green",
+        "notes": "SIEM monitoring all HR database access",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 41,
+        "item_id": 3,
+        "sub_control_id": 11,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 42,
+        "item_id": 3,
+        "sub_control_id": 12,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 43,
+        "item_id": 3,
+        "sub_control_id": 13,
+        "status": "red",
+        "notes": "Backup infrastructure needs budget approval",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 44,
+        "item_id": 3,
+        "sub_control_id": 14,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 45,
+        "item_id": 3,
+        "sub_control_id": 15,
+        "status": "yellow",
+        "notes": "Partially implemented, improvements needed",
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+      }
     ]
   }
 }
