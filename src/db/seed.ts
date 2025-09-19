@@ -19,6 +19,7 @@ const seedData = async () => {
       item_type: 'Application',
       owner: 'Engineering Team',
       criticality: 'high',
+      tags: JSON.stringify(['production', 'public-facing', 'react', 'customer']),
       created_at: '2024-01-15T10:30:00Z',
       updated_at: '2024-01-15T10:30:00Z'
     },
@@ -29,6 +30,7 @@ const seedData = async () => {
       item_type: 'System',
       owner: 'Finance Team',
       criticality: 'critical',
+      tags: JSON.stringify(['production', 'financial', 'pci-dss', 'payments', 'critical']),
       created_at: '2024-01-16T14:20:00Z',
       updated_at: '2024-01-16T14:20:00Z'
     },
@@ -39,6 +41,7 @@ const seedData = async () => {
       item_type: 'Database',
       owner: 'HR Team',
       criticality: 'high',
+      tags: JSON.stringify(['internal', 'database', 'pii', 'hr']),
       created_at: '2024-01-10T09:15:00Z',
       updated_at: '2024-01-10T09:15:00Z'
     },
@@ -49,6 +52,7 @@ const seedData = async () => {
       item_type: 'Application',
       owner: 'Marketing Team',
       criticality: 'medium',
+      tags: JSON.stringify(['public-facing', 'marketing', 'static', 'wordpress']),
       created_at: '2024-01-12T16:45:00Z',
       updated_at: '2024-01-12T16:45:00Z'
     }
@@ -59,30 +63,35 @@ const seedData = async () => {
     {
       name: 'Access Control',
       description: 'User authentication and authorization',
+      sort_order: 0,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z'
     },
     {
       name: 'Data Encryption',
       description: 'Encryption of sensitive data',
+      sort_order: 1,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z'
     },
     {
       name: 'Vulnerability Management',
       description: 'Regular vulnerability scanning and patching',
+      sort_order: 2,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z'
     },
     {
       name: 'Audit Logging',
       description: 'System and user activity logging',
+      sort_order: 3,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z'
     },
     {
       name: 'Backup and Recovery',
       description: 'Data backup and disaster recovery',
+      sort_order: 4,
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z'
     }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Shield, Edit } from 'lucide-react';
-import { SearchBar, useToast, Modal, Tooltip, SubControlStatusModal } from '../components/ui';
+import { SearchBar, useToast, Modal, Tooltip, SubControlStatusModal, Tags } from '../components/ui';
 import { getControlMatrixData, updateControlImplementation, getSubControlsByControl, getSubControlImplementationsByItem } from '../services/securityData';
 import { getStatusConfig, getStatusName } from '../utils/statusConfig';
 import type { Item, Environment, SecurityControl, ControlStatus, SubControl, SubControlImplementation } from '../types';
@@ -28,6 +28,7 @@ export default function Items() {
   const [selectedItem, setSelectedItem] = useState<EnvironmentWithControlStatuses | null>(null);
   const [isSubControlModalOpen, setIsSubControlModalOpen] = useState(false);
   const [selectedControl, setSelectedControl] = useState<SecurityControl | null>(null);
+  const [subControlsTooltipData, setSubControlsTooltipData] = useState<{[key: string]: {subControls: SubControl[], implementations: SubControlImplementation[]}}>({});
   const { success } = useToast();
   const [statusConfig, setStatusConfig] = useState(getStatusConfig());
 
@@ -37,6 +38,27 @@ export default function Items() {
         setLoading(true);
         const data = await getControlMatrixData();
         setMatrixData(data);
+
+        // Load sub-control data for tooltips
+        const tooltipData: {[key: string]: {subControls: SubControl[], implementations: SubControlImplementation[]}} = {};
+
+        for (const control of data.controls) {
+          for (const environment of data.environments) {
+            const key = `${environment.id}-${control.id}`;
+            try {
+              const [subControls, implementations] = await Promise.all([
+                getSubControlsByControl(control.id),
+                getSubControlImplementationsByItem(environment.id, control.id)
+              ]);
+              tooltipData[key] = { subControls, implementations };
+            } catch (error) {
+              console.error(`Failed to load sub-control data for tooltip ${key}:`, error);
+              tooltipData[key] = { subControls: [], implementations: [] };
+            }
+          }
+        }
+
+        setSubControlsTooltipData(tooltipData);
       } catch (error) {
         console.error('Failed to load matrix data:', error);
       } finally {
@@ -61,11 +83,12 @@ export default function Items() {
     };
   }, []);
 
-  const filteredEnvironments = (matrixData.environments || []).filter(environment => 
+  const filteredEnvironments = (matrixData.environments || []).filter(environment =>
     environment.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (environment.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
     (environment.category?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-    (environment.owner?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    (environment.owner?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+    (environment.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ?? false)
   );
 
   const getStatusColor = (status: string) => {
@@ -73,6 +96,7 @@ export default function Items() {
       case 'green': return 'bg-green-500';
       case 'yellow': return 'bg-yellow-500';
       case 'red': return 'bg-red-500';
+      case 'gray': return 'bg-gray-500';
       case 'unknown': return 'bg-gray-300';
       default: return 'bg-gray-300';
     }
@@ -83,8 +107,19 @@ export default function Items() {
       case 'green': return '●';
       case 'yellow': return '●';
       case 'red': return '●';
+      case 'gray': return '●';
       case 'unknown': return '○';
       default: return '○';
+    }
+  };
+
+  const getStatusDisplayName = (status: string) => {
+    switch (status) {
+      case 'green': return 'Implemented';
+      case 'yellow': return 'In Progress';
+      case 'red': return 'Not Implemented';
+      case 'gray': return 'Not Applicable';
+      default: return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
 
@@ -176,9 +211,34 @@ export default function Items() {
     });
   });
 
-  const highRiskEnvironments = (matrixData.environments || []).filter(environment => 
+  const highRiskEnvironments = (matrixData.environments || []).filter(environment =>
     environment.criticality === 'critical' || environment.criticality === 'high'
   ).length;
+
+  // Generate tooltip content with sub-control status
+  const generateTooltipContent = (environment: EnvironmentWithControlStatuses, control: SecurityControl) => {
+    const controlStatus = environment.controlStatuses[control.id];
+    const key = `${environment.id}-${control.id}`;
+    const subControlData = subControlsTooltipData[key];
+
+    let tooltip = `${control.name}: ${controlStatus.notes || 'No notes'}`;
+
+    if (subControlData && subControlData.subControls.length > 0) {
+      const subControlStatuses = subControlData.subControls.map(subControl => {
+        const implementation = subControlData.implementations.find(
+          impl => impl.sub_control_id === subControl.id
+        );
+        const status = implementation?.status || 'red';
+        const statusEmoji = status === 'green' ? '✅' : status === 'yellow' ? '⚠️' : '❌';
+        return `${statusEmoji} ${subControl.name}`;
+      });
+
+      tooltip += `\n\nSub-Controls:\n${subControlStatuses.join('\n')}`;
+    }
+
+    tooltip += '\n\nClick to view details';
+    return tooltip;
+  };
 
   return (
     <div className="space-y-6">
@@ -266,7 +326,7 @@ export default function Items() {
           <SearchBar
             value={searchQuery}
             onSearch={setSearchQuery}
-            placeholder="Search environments by name, description, category, or owner..."
+            placeholder="Search environments by name, description, category, owner, or tags..."
             className="max-w-md"
           />
         </div>
@@ -333,7 +393,7 @@ export default function Items() {
                           <div className="min-w-[140px] flex justify-center">
                             <div
                               className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-white font-bold text-sm cursor-pointer hover:scale-110 transition-transform ${getStatusColor(controlStatus.status)}`}
-                              title={`${control.name}: ${controlStatus.notes} (Click to view sub-controls)`}
+                              title={generateTooltipContent(environment, control)}
                               onClick={() => handleStatusClick(environment, control)}
                             >
                               {getStatusIcon(controlStatus.status)}
@@ -365,6 +425,9 @@ export default function Items() {
             onClose={() => setIsItemModalOpen(false)}
             onItemUpdate={handleEnvironmentUpdate}
             onOpenSubControlModal={handleOpenSubControlModal}
+            highlightedControl={selectedItemControl?.control}
+            getStatusColor={getStatusColor}
+            getStatusDisplayName={getStatusDisplayName}
           />
         )}
       </Modal>
@@ -397,25 +460,16 @@ interface StatusEditFormProps {
   currentNotes: string;
   onSave: (status: string, notes: string) => void;
   onCancel: () => void;
+  getStatusColor: (status: string) => string;
 }
 
-function StatusEditForm({ item, control, currentStatus, currentNotes, onSave, onCancel }: StatusEditFormProps) {
+function StatusEditForm({ item, control, currentStatus, currentNotes, onSave, onCancel, getStatusColor }: StatusEditFormProps) {
   const [status, setStatus] = useState(currentStatus);
   const [notes, setNotes] = useState(currentNotes);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(status, notes);
-  };
-
-  const getStatusColor = (statusValue: string) => {
-    switch (statusValue) {
-      case 'green': return 'bg-green-500';
-      case 'yellow': return 'bg-yellow-500';
-      case 'red': return 'bg-red-500';
-      case 'unknown': return 'bg-gray-300';
-      default: return 'bg-gray-300';
-    }
   };
 
   const statusConfig = getStatusConfig();
@@ -512,12 +566,16 @@ interface ItemDetailsViewProps {
   onClose: () => void;
   onItemUpdate: (updatedItem: EnvironmentWithControlStatuses) => void;
   onOpenSubControlModal: (control: SecurityControl, item: EnvironmentWithControlStatuses) => void;
+  highlightedControl?: SecurityControl;
+  getStatusColor: (status: string) => string;
+  getStatusDisplayName: (status: string) => string;
 }
 
-function ItemDetailsView({ item, controls, onClose, onItemUpdate, onOpenSubControlModal }: ItemDetailsViewProps) {
+function ItemDetailsView({ item, controls, onClose, onItemUpdate, onOpenSubControlModal, highlightedControl, getStatusColor, getStatusDisplayName }: ItemDetailsViewProps) {
   const [editingNotes, setEditingNotes] = useState<{[key: string]: string}>({});
   const [localItem, setLocalItem] = useState(item);
   const [subControlsData, setSubControlsData] = useState<{[controlId: number]: {subControls: SubControl[], implementations: SubControlImplementation[]}}>({});
+  const [editingMasterControl, setEditingMasterControl] = useState<{controlId: number, status: string, notes: string} | null>(null);
   const { success } = useToast();
 
   // Update localItem when the parent item prop changes
@@ -593,8 +651,46 @@ function ItemDetailsView({ item, controls, onClose, onItemUpdate, onOpenSubContr
     onItemUpdate(updatedItem);
   };
 
+  const handleEditMasterControl = (controlId: number, currentStatus: string, currentNotes: string) => {
+    setEditingMasterControl({ controlId, status: currentStatus, notes: currentNotes });
+  };
 
+  const handleSaveMasterControl = async () => {
+    if (!editingMasterControl) return;
 
+    try {
+      await updateControlImplementation(
+        localItem.id,
+        editingMasterControl.controlId,
+        editingMasterControl.status,
+        editingMasterControl.notes
+      );
+
+      // Update local state
+      const updatedItem = {
+        ...localItem,
+        controlStatuses: {
+          ...localItem.controlStatuses,
+          [editingMasterControl.controlId]: {
+            status: editingMasterControl.status,
+            notes: editingMasterControl.notes
+          }
+        }
+      };
+
+      setLocalItem(updatedItem);
+      onItemUpdate(updatedItem);
+      handleControlStatusUpdate(localItem.id, editingMasterControl.controlId, editingMasterControl.status, editingMasterControl.notes);
+      setEditingMasterControl(null);
+      success('Master control status updated successfully');
+    } catch (error) {
+      console.error('Failed to update master control:', error);
+    }
+  };
+
+  const handleCancelMasterControlEdit = () => {
+    setEditingMasterControl(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -629,48 +725,138 @@ function ItemDetailsView({ item, controls, onClose, onItemUpdate, onOpenSubContr
         {/* Control Status Summary - moved to top */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Control Status Summary</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(localItem.controlStatuses).map(([controlId, status]) => {
-              const control = controls.find(c => c.id === parseInt(controlId));
-              const controlSubData = subControlsData[parseInt(controlId)];
 
-              return (
-                <div key={controlId} className="bg-gray-50 rounded-lg p-4">
+          {/* Highlighted Control - Show prominently if one was clicked */}
+          {highlightedControl && localItem.controlStatuses[highlightedControl.id] && (() => {
+            const status = localItem.controlStatuses[highlightedControl.id];
+            const controlSubData = subControlsData[highlightedControl.id];
+            const isEditingThisControl = editingMasterControl?.controlId === highlightedControl.id;
+
+            return (
+              <div className="mb-6">
+                <h4 className="text-md font-medium text-gray-700 mb-3">Selected Control</h4>
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6">
                   {/* Master Control */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className={`w-5 h-5 rounded-full ${
-                          status.status === 'green' ? 'bg-green-500' :
-                          status.status === 'yellow' ? 'bg-yellow-500' :
-                          status.status === 'red' ? 'bg-red-500' :
-                          'bg-gray-300'
-                        }`}
-                      ></div>
-                      <div className="flex-1">
-                        <span className="text-sm font-bold text-gray-900">
-                          {control?.name || `Control ${controlId}`}
-                        </span>
-                        {control?.description && (
-                          <div className="text-xs text-gray-500 mt-1 line-clamp-2">
-                            {control.description}
-                          </div>
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-3">
+                        <div
+                          className={`w-5 h-5 rounded-full ${
+                            status.status === 'green' ? 'bg-green-500' :
+                            status.status === 'yellow' ? 'bg-yellow-500' :
+                            status.status === 'red' ? 'bg-red-500' :
+                            'bg-gray-300'
+                          }`}
+                        ></div>
+                        <div className="flex-1">
+                          <span className="text-lg font-bold text-gray-900">
+                            {highlightedControl?.name || `Control ${controlId}`}
+                          </span>
+                          {highlightedControl?.description && (
+                            <div className="text-sm text-gray-600 mt-2">
+                              {highlightedControl.description}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-1">
+                        {/* Edit Master Control Button */}
+                        <button
+                          onClick={() => handleEditMasterControl(highlightedControl.id, status.status, status.notes)}
+                          className="inline-flex items-center px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                          title="Edit master control status"
+                        >
+                          Edit
+                        </button>
+
+                        {/* Edit Sub-Controls Button */}
+                        {controlSubData && controlSubData.subControls.length > 0 && (
+                          <button
+                            onClick={() => {
+                              onOpenSubControlModal(highlightedControl, localItem);
+                            }}
+                            className="inline-flex items-center px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                            title="Edit sub-controls"
+                          >
+                            Sub-Controls
+                          </button>
                         )}
                       </div>
                     </div>
 
-                    {/* Edit Status Button */}
-                    <button
-                      onClick={() => {
-                        if (control) {
-                          onOpenSubControlModal(control, localItem);
-                        }
-                      }}
-                      className="inline-flex items-center px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                      title="Edit status and sub-controls"
-                    >
-                      Edit Status
-                    </button>
+                    {/* Master Control Status Editing */}
+                    {isEditingThisControl && (
+                      <div className="mt-3 p-3 bg-white rounded border">
+                        <div className="space-y-3">
+                          {/* Status Selection */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                            <div className="flex space-x-2">
+                              {(['green', 'yellow', 'red', 'gray'] as const).map((statusOption) => (
+                                <button
+                                  key={statusOption}
+                                  onClick={() => setEditingMasterControl({ ...editingMasterControl, status: statusOption })}
+                                  className={`
+                                    inline-flex items-center px-3 py-1 rounded-md text-xs font-medium transition-colors
+                                    ${editingMasterControl.status === statusOption
+                                      ? `${getStatusColor(statusOption)} text-white`
+                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                                  `}
+                                >
+                                  <div className={`w-2 h-2 rounded-full mr-1 ${
+                                    editingMasterControl.status === statusOption
+                                      ? 'bg-white'
+                                      : getStatusColor(statusOption)
+                                  }`} />
+                                  {getStatusDisplayName(statusOption)}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Notes */}
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                            <textarea
+                              value={editingMasterControl.notes}
+                              onChange={(e) => setEditingMasterControl({ ...editingMasterControl, notes: e.target.value })}
+                              className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                              rows={2}
+                              placeholder="Add notes about the implementation..."
+                            />
+                          </div>
+
+                          {/* Save/Cancel buttons */}
+                          <div className="flex justify-end space-x-2">
+                            <button
+                              onClick={handleCancelMasterControlEdit}
+                              className="px-3 py-1 text-xs border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={handleSaveMasterControl}
+                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Current Status Display */}
+                    {!isEditingThisControl && (
+                      <div className="mt-2 text-xs text-gray-600">
+                        <strong>Status:</strong> {getStatusDisplayName(status.status)}
+                        {status.notes && (
+                          <div className="mt-1 text-gray-500 break-words">
+                            <strong>Notes:</strong> {status.notes}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Sub-Controls */}
@@ -702,8 +888,177 @@ function ItemDetailsView({ item, controls, onClose, onItemUpdate, onOpenSubContr
                     </div>
                   )}
                 </div>
-              );
-            })}
+              </div>
+            );
+          })()}
+
+          {/* Remaining Controls Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(localItem.controlStatuses)
+              .filter(([controlId]) => !highlightedControl || parseInt(controlId) !== highlightedControl.id)
+              .map(([controlId, status]) => {
+                const control = controls.find(c => c.id === parseInt(controlId));
+                const controlSubData = subControlsData[parseInt(controlId)];
+                const isEditingThisControl = editingMasterControl?.controlId === parseInt(controlId);
+
+                return (
+                  <div key={controlId} className="bg-gray-50 rounded-lg p-4">
+                    {/* Master Control */}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center space-x-3">
+                          <div
+                            className={`w-5 h-5 rounded-full ${
+                              status.status === 'green' ? 'bg-green-500' :
+                              status.status === 'yellow' ? 'bg-yellow-500' :
+                              status.status === 'red' ? 'bg-red-500' :
+                              'bg-gray-300'
+                            }`}
+                          ></div>
+                          <div className="flex-1">
+                            <span className="text-sm font-bold text-gray-900">
+                              {control?.name || `Control ${controlId}`}
+                            </span>
+                            {control?.description && (
+                              <div className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                {control.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex space-x-1">
+                          {/* Edit Master Control Button */}
+                          <button
+                            onClick={() => handleEditMasterControl(parseInt(controlId), status.status, status.notes)}
+                            className="inline-flex items-center px-2 py-1 text-xs bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                            title="Edit master control status"
+                          >
+                            Edit
+                          </button>
+
+                          {/* Edit Sub-Controls Button */}
+                          {controlSubData && controlSubData.subControls.length > 0 && (
+                            <button
+                              onClick={() => {
+                                if (control) {
+                                  onOpenSubControlModal(control, localItem);
+                                }
+                              }}
+                              className="inline-flex items-center px-2 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                              title="Edit sub-controls"
+                            >
+                              Sub-Controls
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Master Control Status Editing */}
+                      {isEditingThisControl && (
+                        <div className="mt-3 p-3 bg-white rounded border">
+                          <div className="space-y-3">
+                            {/* Status Selection */}
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                              <div className="flex space-x-2">
+                                {(['green', 'yellow', 'red', 'gray'] as const).map((statusOption) => (
+                                  <button
+                                    key={statusOption}
+                                    onClick={() => setEditingMasterControl({ ...editingMasterControl, status: statusOption })}
+                                    className={`
+                                      inline-flex items-center px-3 py-1 rounded-md text-xs font-medium transition-colors
+                                      ${editingMasterControl.status === statusOption
+                                        ? `${getStatusColor(statusOption)} text-white`
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                                    `}
+                                  >
+                                    <div className={`w-2 h-2 rounded-full mr-1 ${
+                                      editingMasterControl.status === statusOption
+                                        ? 'bg-white'
+                                        : getStatusColor(statusOption)
+                                    }`} />
+                                    {getStatusDisplayName(statusOption)}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Notes */}
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                              <textarea
+                                value={editingMasterControl.notes}
+                                onChange={(e) => setEditingMasterControl({ ...editingMasterControl, notes: e.target.value })}
+                                className="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                                rows={2}
+                                placeholder="Add notes about the implementation..."
+                              />
+                            </div>
+
+                            {/* Save/Cancel buttons */}
+                            <div className="flex justify-end space-x-2">
+                              <button
+                                onClick={handleCancelMasterControlEdit}
+                                className="px-3 py-1 text-xs border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                onClick={handleSaveMasterControl}
+                                className="px-3 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Current Status Display */}
+                      {!isEditingThisControl && (
+                        <div className="mt-2 text-xs text-gray-600">
+                          <strong>Status:</strong> {getStatusDisplayName(status.status)}
+                          {status.notes && (
+                            <div className="mt-1 text-gray-500 break-words">
+                              <strong>Notes:</strong> {status.notes}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sub-Controls */}
+                    {controlSubData && controlSubData.subControls.length > 0 && (
+                      <div className="mt-3 pl-4 border-l-2 border-gray-200">
+                        <div className="text-xs font-medium text-gray-600 mb-2">Sub-Controls:</div>
+                        <div className="space-y-2">
+                          {controlSubData.subControls.map((subControl) => {
+                            const implementation = controlSubData.implementations.find(
+                              impl => impl.sub_control_id === subControl.id
+                            );
+                            const subStatus = implementation?.status || 'red';
+
+                            return (
+                              <div key={subControl.id} className="flex items-center space-x-2">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  subStatus === 'green' ? 'bg-green-500' :
+                                  subStatus === 'yellow' ? 'bg-yellow-500' :
+                                  subStatus === 'red' ? 'bg-red-500' :
+                                  'bg-gray-300'
+                                }`}></div>
+                                <span className="text-xs text-gray-700 flex-1">
+                                  {subControl.name}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         </div>
 
@@ -724,6 +1079,15 @@ function ItemDetailsView({ item, controls, onClose, onItemUpdate, onOpenSubContr
               <span className="text-sm text-gray-900">{item.owner}</span>
             </div>
           )}
+
+          <div className="py-2 border-b border-gray-100">
+            <div className="text-sm font-medium text-gray-500 mb-2">Tags:</div>
+            {item.tags && item.tags.length > 0 ? (
+              <Tags tags={item.tags} onChange={() => {}} readOnly />
+            ) : (
+              <span className="text-sm text-gray-400">No tags assigned</span>
+            )}
+          </div>
 
           <div className="flex justify-between py-2 border-b border-gray-100">
             <span className="text-sm font-medium text-gray-500">Created:</span>

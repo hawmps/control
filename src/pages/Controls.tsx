@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Shield, Edit, Trash2, Eye, Settings } from 'lucide-react';
-import { DataTable, SearchBar, useToast, Modal, SubControlModal } from '../components/ui';
-import { getSecurityControls, createSecurityControl, updateSecurityControl, deleteSecurityControl, getSubControlsByControl } from '../services/securityData';
-import type { SecurityControl, Column, SubControl } from '../types';
+import { Plus, Shield, Edit, Trash2, Eye, Settings, GripVertical } from 'lucide-react';
+import { SearchBar, useToast, Modal, SubControlModal } from '../components/ui';
+import { getSecurityControls, createSecurityControl, updateSecurityControl, deleteSecurityControl, getSubControlsByControl, reorderSecurityControls } from '../services/securityData';
+import type { SecurityControl, SubControl } from '../types';
 
 export default function Controls() {
   const [controls, setControls] = useState<SecurityControl[]>([]);
@@ -13,6 +13,8 @@ export default function Controls() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isSubControlModalOpen, setIsSubControlModalOpen] = useState(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const { success } = useToast();
 
   useEffect(() => {
@@ -62,65 +64,58 @@ export default function Controls() {
     }
   };
 
-  const columns: Column<SecurityControl>[] = [
-    {
-      key: 'name',
-      header: 'Control Details',
-      sortable: true,
-      render: (_, control) => (
-        <div className="flex items-center">
-          <Shield className="w-8 h-8 text-green-500 mr-3" />
-          <div>
-            <div className="font-medium text-gray-900">{control.name}</div>
-            <div className="text-sm text-gray-500">{control.description}</div>
-          </div>
-        </div>
-      )
-    },
-    {
-      key: 'created_at',
-      header: 'Created',
-      sortable: true,
-      render: (value) => new Date(value).toLocaleDateString()
-    },
-    {
-      key: 'actions',
-      header: 'Actions',
-      sortable: false,
-      render: (_, control) => (
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={() => handleView(control)}
-            className="p-1 text-gray-400 hover:text-blue-500"
-            title="View Details"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleManageSubControls(control)}
-            className="p-1 text-gray-400 hover:text-purple-500"
-            title="Manage Sub-Controls"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleEdit(control)}
-            className="p-1 text-gray-400 hover:text-yellow-500"
-            title="Edit Control"
-          >
-            <Edit className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleDelete(control)}
-            className="p-1 text-gray-400 hover:text-red-500"
-            title="Delete Control"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      )
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', '');
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
     }
-  ];
+
+    const newControls = [...controls];
+    const draggedControl = newControls[draggedIndex];
+
+    // Remove dragged item
+    newControls.splice(draggedIndex, 1);
+
+    // Insert at new position
+    newControls.splice(dropIndex, 0, draggedControl);
+
+    try {
+      const controlIds = newControls.map(c => c.id);
+      await reorderSecurityControls(controlIds);
+      setControls(newControls);
+      success('Controls reordered successfully');
+    } catch (error) {
+      console.error('Failed to reorder controls:', error);
+    }
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
 
   // Calculate statistics
   const totalControls = controls.length;
@@ -202,15 +197,116 @@ export default function Controls() {
       </div>
 
       <div className="card">
-        <DataTable
-          data={filteredControls}
-          columns={columns}
-          loading={loading}
-          pageSize={10}
-          className="border-0 shadow-none"
-          emptyMessage="No security controls found. Create your first control to get started."
-          emptyIcon={Shield}
-        />
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <span className="ml-3 text-gray-600">Loading security controls...</span>
+          </div>
+        )}
+
+        {!loading && filteredControls.length === 0 && (
+          <div className="text-center py-12">
+            <Shield className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No security controls found</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Create your first control to get started.
+            </p>
+          </div>
+        )}
+
+        {!loading && filteredControls.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                    Drag
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Control Details
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Created
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredControls.map((control, index) => (
+                  <tr
+                    key={control.id}
+                    className={`
+                      hover:bg-gray-50 transition-colors
+                      ${draggedIndex === index ? 'opacity-50' : ''}
+                      ${dragOverIndex === index ? 'bg-blue-50 border-t-2 border-blue-500' : ''}
+                    `}
+                    onDragOver={(e) => handleDragOver(e, index)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div
+                        className="flex items-center justify-center cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, index)}
+                        onDragEnd={handleDragEnd}
+                        title="Drag to reorder"
+                      >
+                        <GripVertical className="w-5 h-5" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <Shield className="w-8 h-8 text-green-500 mr-3" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{control.name}</div>
+                          <div className="text-sm text-gray-500">{control.description}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {new Date(control.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleView(control)}
+                          className="p-1 text-gray-400 hover:text-blue-500"
+                          title="View Details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleManageSubControls(control)}
+                          className="p-1 text-gray-400 hover:text-purple-500"
+                          title="Manage Sub-Controls"
+                        >
+                          <Settings className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(control)}
+                          className="p-1 text-gray-400 hover:text-yellow-500"
+                          title="Edit Control"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(control)}
+                          className="p-1 text-gray-400 hover:text-red-500"
+                          title="Delete Control"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Add Control Modal */}

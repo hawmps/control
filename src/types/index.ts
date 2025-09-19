@@ -11,6 +11,7 @@ export interface Item {
   item_type?: string;
   owner?: string;
   criticality: CriticalityLevel;
+  tags?: string[]; // Array of tag strings
   created_at: string;
   updated_at: string;
 }
@@ -22,6 +23,7 @@ export interface SecurityControl {
   id: number;
   name: string;
   description?: string;
+  sort_order?: number;
   created_at: string;
   updated_at: string;
 }

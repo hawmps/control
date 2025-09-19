@@ -19,3 +19,6 @@ export * from './Tooltip';
 // Sub-control modals
 export * from './SubControlModal';
 export * from './SubControlStatusModal';
+
+// Tags components
+export * from './Tags';

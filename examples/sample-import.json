@@ -46,6 +46,7 @@
         "id": 1,
         "name": "Access Control",
         "description": "User authentication and authorization mechanisms",
+        "sort_order": 0,
         "created_at": "2024-01-01T00:00:00Z",
         "updated_at": "2024-01-01T00:00:00Z"
       },
@@ -53,6 +54,7 @@
         "id": 2,
         "name": "Data Encryption",
         "description": "Encryption of sensitive data at rest and in transit",
+        "sort_order": 1,
         "created_at": "2024-01-01T00:00:00Z",
         "updated_at": "2024-01-01T00:00:00Z"
       },
@@ -60,6 +62,7 @@
         "id": 3,
         "name": "Vulnerability Management",
         "description": "Regular vulnerability scanning and patch management",
+        "sort_order": 2,
         "created_at": "2024-01-01T00:00:00Z",
         "updated_at": "2024-01-01T00:00:00Z"
       },
@@ -67,6 +70,7 @@
         "id": 4,
         "name": "Audit Logging",
         "description": "Comprehensive logging of system and user activities",
+        "sort_order": 3,
         "created_at": "2024-01-01T00:00:00Z",
         "updated_at": "2024-01-01T00:00:00Z"
       },
@@ -74,6 +78,7 @@
         "id": 5,
         "name": "Backup and Recovery",
         "description": "Data backup and disaster recovery procedures",
+        "sort_order": 4,
         "created_at": "2024-01-01T00:00:00Z",
         "updated_at": "2024-01-01T00:00:00Z"
       }

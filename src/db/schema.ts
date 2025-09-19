@@ -9,6 +9,7 @@ export const items = sqliteTable('items', {
   item_type: text('item_type'),
   owner: text('owner'),
   criticality: text('criticality'),
+  tags: text('tags'), // JSON string array of tags
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull()
 });
@@ -17,6 +18,7 @@ export const securityControls = sqliteTable('security_controls', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name').notNull(),
   description: text('description'),
+  sort_order: integer('sort_order').default(0),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull()
 });

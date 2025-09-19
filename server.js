@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from './src/db/schema.ts';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc, sql } from 'drizzle-orm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -46,7 +46,12 @@ setupDatabase();
 app.get('/api/items', async (req, res) => {
   try {
     const items = await db.select().from(schema.items);
-    res.json(items);
+    // Parse tags from JSON string to array
+    const itemsWithTags = items.map(item => ({
+      ...item,
+      tags: item.tags ? JSON.parse(item.tags) : []
+    }));
+    res.json(itemsWithTags);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -54,12 +59,24 @@ app.get('/api/items', async (req, res) => {
 
 app.post('/api/items', async (req, res) => {
   try {
+    const itemData = { ...req.body };
+    // Serialize tags array to JSON string
+    if (itemData.tags && Array.isArray(itemData.tags)) {
+      itemData.tags = JSON.stringify(itemData.tags);
+    }
+
     const [newItem] = await db.insert(schema.items).values({
-      ...req.body,
+      ...itemData,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }).returning();
-    res.json(newItem);
+
+    // Parse tags back to array for response
+    const itemWithTags = {
+      ...newItem,
+      tags: newItem.tags ? JSON.parse(newItem.tags) : []
+    };
+    res.json(itemWithTags);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -67,9 +84,15 @@ app.post('/api/items', async (req, res) => {
 
 app.put('/api/items/:id', async (req, res) => {
   try {
+    const updateData = { ...req.body };
+    // Serialize tags array to JSON string
+    if (updateData.tags && Array.isArray(updateData.tags)) {
+      updateData.tags = JSON.stringify(updateData.tags);
+    }
+
     await db.update(schema.items)
       .set({
-        ...req.body,
+        ...updateData,
         updated_at: new Date().toISOString()
       })
       .where(eq(schema.items.id, parseInt(req.params.id)));
@@ -92,7 +115,7 @@ app.delete('/api/items/:id', async (req, res) => {
 // Security Controls
 app.get('/api/controls', async (req, res) => {
   try {
-    const controls = await db.select().from(schema.securityControls);
+    const controls = await db.select().from(schema.securityControls).orderBy(asc(schema.securityControls.sort_order), asc(schema.securityControls.id));
     res.json(controls);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -101,13 +124,53 @@ app.get('/api/controls', async (req, res) => {
 
 app.post('/api/controls', async (req, res) => {
   try {
+    // Get the highest sort_order and add 1
+    const maxSortOrder = await db.select({ maxSort: sql`MAX(sort_order)` }).from(schema.securityControls);
+    const nextSortOrder = (maxSortOrder[0]?.maxSort || 0) + 1;
+
     const [newControl] = await db.insert(schema.securityControls).values({
       ...req.body,
+      sort_order: nextSortOrder,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     }).returning();
     res.json(newControl);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.put('/api/controls/reorder', async (req, res) => {
+  try {
+    const { controlIds } = req.body; // Array of control IDs in new order
+
+    if (!controlIds || !Array.isArray(controlIds)) {
+      return res.status(400).json({ error: 'controlIds must be an array' });
+    }
+
+    // Update sort_order for each control using a transaction-like approach
+    for (let i = 0; i < controlIds.length; i++) {
+      const controlId = parseInt(controlIds[i]);
+      if (isNaN(controlId)) {
+        return res.status(400).json({ error: `Invalid control ID: ${controlIds[i]}` });
+      }
+
+      const result = await db.update(schema.securityControls)
+        .set({
+          sort_order: i,
+          updated_at: new Date().toISOString()
+        })
+        .where(eq(schema.securityControls.id, controlId))
+        .returning({ id: schema.securityControls.id });
+
+      if (!result || result.length === 0) {
+        return res.status(404).json({ error: `Control with ID ${controlId} not found` });
+      }
+    }
+
+    res.json({ succsec: true });
+  } catch (error) {
+    console.error('Error reordering controls:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -136,6 +199,7 @@ app.delete('/api/controls/:id', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
 
 // Sub-Controls
 app.get('/api/sub-controls', async (req, res) => {
@@ -322,7 +386,7 @@ app.put('/api/implementations/:itemId/:controlId', async (req, res) => {
 // Matrix data (combined endpoint)
 app.get('/api/matrix', async (req, res) => {
   try {
-    const controls = await db.select().from(schema.securityControls);
+    const controls = await db.select().from(schema.securityControls).orderBy(asc(schema.securityControls.sort_order), asc(schema.securityControls.id));
     const items = await db.select().from(schema.items);
     const implementations = await db.select().from(schema.controlImplementations);
 
@@ -341,6 +405,7 @@ app.get('/api/matrix', async (req, res) => {
 
         return {
           ...item,
+          tags: item.tags ? JSON.parse(item.tags) : [],
           controlStatuses
         };
       })

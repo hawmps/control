@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, Package, Edit, Trash2, Eye } from 'lucide-react';
-import { DataTable, SearchBar, useToast, Modal } from '../components/ui';
+import { DataTable, SearchBar, useToast, Modal, Tags } from '../components/ui';
 import { getEnvironments, createEnvironment, updateEnvironment, deleteEnvironment, createItem, updateItem, deleteItem } from '../services/securityData';
 import type { Item, Environment, Column, CriticalityLevel } from '../types';
 
@@ -29,11 +29,12 @@ export default function EnvironmentsManagement() {
     loadEnvironments();
   }, []);
 
-  const filteredEnvironments = environments.filter(environment => 
+  const filteredEnvironments = environments.filter(environment =>
     environment.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (environment.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
     (environment.category?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-    (environment.owner?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+    (environment.owner?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+    (environment.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ?? false)
   );
 
   const getCriticalityColor = (criticality: string) => {
@@ -93,6 +94,23 @@ export default function EnvironmentsManagement() {
       render: (value) => value ? (
         <span className="text-sm text-gray-700">{value}</span>
       ) : '-'
+    },
+    {
+      key: 'tags',
+      header: 'Tags',
+      sortable: false,
+      render: (_, environment) => (
+        <div className="max-w-[200px]">
+          {environment.tags && environment.tags.length > 0 ? (
+            <Tags tags={environment.tags.slice(0, 3)} onChange={() => {}} readOnly />
+          ) : (
+            <span className="text-xs text-gray-400">No tags</span>
+          )}
+          {environment.tags && environment.tags.length > 3 && (
+            <span className="text-xs text-gray-500 ml-1">+{environment.tags.length - 3}</span>
+          )}
+        </div>
+      )
     },
     {
       key: 'criticality',
@@ -163,7 +181,7 @@ export default function EnvironmentsManagement() {
           <SearchBar
             value={searchQuery}
             onSearch={setSearchQuery}
-            placeholder="Search environments by name, description, category, or owner..."
+            placeholder="Search environments by name, description, category, owner, or tags..."
             className="max-w-md"
           />
         </div>
@@ -266,7 +284,8 @@ function EnvironmentForm({ initialData, onSave, onCancel }: EnvironmentFormProps
     category: initialData?.category || '',
     item_type: initialData?.item_type || '',
     owner: initialData?.owner || '',
-    criticality: initialData?.criticality || 'medium' as CriticalityLevel
+    criticality: initialData?.criticality || 'medium' as CriticalityLevel,
+    tags: initialData?.tags || []
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -334,35 +353,44 @@ function EnvironmentForm({ initialData, onSave, onCancel }: EnvironmentFormProps
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Owner
-          </label>
-          <input
-            type="text"
-            value={formData.owner}
-            onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="e.g., Engineering Team, IT Department"
-          />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Owner
+        </label>
+        <input
+          type="text"
+          value={formData.owner}
+          onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          placeholder="e.g., Engineering Team, IT Department"
+        />
+      </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Criticality
-          </label>
-          <select
-            value={formData.criticality}
-            onChange={(e) => setFormData({ ...formData, criticality: e.target.value as CriticalityLevel })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="critical">Critical</option>
-          </select>
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Tags
+        </label>
+        <Tags
+          tags={formData.tags}
+          onChange={(tags) => setFormData({ ...formData, tags })}
+          placeholder="Add tag (e.g., production, database, public-facing)"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Criticality
+        </label>
+        <select
+          value={formData.criticality}
+          onChange={(e) => setFormData({ ...formData, criticality: e.target.value as CriticalityLevel })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        >
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">
@@ -433,6 +461,16 @@ function EnvironmentDetails({ environment, onClose }: EnvironmentDetailsProps) {
                 <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getCriticalityColor(environment.criticality)}`}>
                   {environment.criticality?.charAt(0).toUpperCase() + environment.criticality?.slice(1)}
                 </span>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500">Tags</dt>
+              <dd>
+                {environment.tags && environment.tags.length > 0 ? (
+                  <Tags tags={environment.tags} onChange={() => {}} readOnly />
+                ) : (
+                  <span className="text-sm text-gray-400">No tags assigned</span>
+                )}
               </dd>
             </div>
           </dl>

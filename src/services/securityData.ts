@@ -338,3 +338,15 @@ export const createSubControlImplementation = async (implementationData: Omit<Su
   if (!response.ok) throw new Error('Failed to create sub-control implementation');
   return response.json();
 };
+
+// Security Controls Reordering
+export const reorderSecurityControls = async (controlIds: number[]): Promise<void> => {
+  const response = await fetch(`${API_BASE}/controls/reorder`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ controlIds }),
+  });
+  if (!response.ok) throw new Error('Failed to reorder security controls');
+};
